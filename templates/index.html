@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="sk" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Správy Dňa</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Vlastné štýly -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.0">
+</head>
+<body class="bg-body-tertiary">
+
+    <!-- Navbar / Header -->
+    <nav class="navbar navbar-expand-lg navbar-dark glass-nav shadow-sm sticky-top mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-newspaper me-2"></i>Správy Dňa</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav align-items-center">
+                    <li class="nav-item">
+                        <button class="btn nav-link" id="theme-toggle" title="Prepnúť tmavý režim">
+                            <i class="bi bi-moon-stars-fill"></i>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mb-5">
+        
+        <!-- Hero Section -->
+        <div class="text-center py-4 mb-5 fade-in-up">
+            <h1 class="display-4 fw-bold text-body-emphasis">Prehľad dňa</h1>
+            <p class="lead text-body-secondary">Automaticky vybrané a zosumarizované správy zo slovenských a svetových médií.</p>
+        </div>
+
+        <!-- Podcasty -->
+        {% if podcast_pozitivny_exists or podcast_vsetky_exists %}
+        <section class="row g-4 mb-5 justify-content-center fade-in-up delay-100">
+            {% if podcast_pozitivny_exists %}
+            <div class="col-md-6 col-lg-5">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-3 text-success">
+                            <i class="bi bi-mic-fill fs-1"></i>
+                        </div>
+                        <h3 class="h5 card-title">Pozitívne správy</h3>
+                        <p class="text-body-secondary small mb-3">Denný hlasový prehľad</p>
+                        <audio class="w-100" controls src="{{ url_for('static', filename='podcast_pozitivny.mp3') }}?v={{ now().timestamp() }}"></audio>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if podcast_vsetky_exists %}
+            <div class="col-md-6 col-lg-5">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-3 text-primary">
+                            <i class="bi bi-broadcast fs-1"></i>
+                        </div>
+                        <h3 class="h5 card-title">Všetky dôležité správy</h3>
+                        <p class="text-body-secondary small mb-3">Komplexný prehľad dňa</p>
+                        <audio class="w-100" controls src="{{ url_for('static', filename='podcast_vsetky.mp3') }}?v={{ now().timestamp() }}"></audio>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        <!-- Štatistiky -->
+        {% if stats.total > 0 %}
+        <section class="row mb-5 justify-content-center g-3 fade-in-up delay-200">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div>
+                            <h6 class="text-uppercase text-body-secondary mb-1">Pozitívne</h6>
+                            <h2 class="mb-0 text-success">{{ stats.pozitivne.count }}</h2>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-success-subtle text-success-emphasis rounded-pill">{{ stats.pozitivne.percent }}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div>
+                            <h6 class="text-uppercase text-body-secondary mb-1">Neutrálne</h6>
+                            <h2 class="mb-0 text-warning">{{ stats.neutralne.count }}</h2>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">{{ stats.neutralne.percent }}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div>
+                            <h6 class="text-uppercase text-body-secondary mb-1">Negatívne</h6>
+                            <h2 class="mb-0 text-danger">{{ stats.negativne.count }}</h2>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">{{ stats.negativne.percent }}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Filtre -->
+        <section class="mb-5 text-center fade-in-up delay-300">
+            <div class="btn-group shadow-sm" role="group" aria-label="Filtrovanie podľa nálady">
+                <input type="checkbox" class="btn-check filter-btn" id="btn-check-positive" autocomplete="off" value="pozitívny" checked>
+                <label class="btn btn-outline-success btn-lg" for="btn-check-positive">
+                    <i class="bi bi-emoji-smile-fill me-1"></i> Pozitívne
+                </label>
+              
+                <input type="checkbox" class="btn-check filter-btn" id="btn-check-neutral" autocomplete="off" value="neutrálny" checked>
+                <label class="btn btn-outline-warning btn-lg" for="btn-check-neutral">
+                    <i class="bi bi-emoji-neutral-fill me-1"></i> Neutrálne
+                </label>
+              
+                <input type="checkbox" class="btn-check filter-btn" id="btn-check-negative" autocomplete="off" value="negatívny" checked>
+                <label class="btn btn-outline-danger btn-lg" for="btn-check-negative">
+                    <i class="bi bi-emoji-frown-fill me-1"></i> Negatívne
+                </label>
+            </div>
+        </section>
+
+        <!-- Články -->
+        <div id="articles-container" class="fade-in-up delay-400">
+        {% for kategoria, clanky_v_kategorii in kategorie.items() %}
+            <section class="category-section mb-5" data-category="{{ kategoria }}">
+                <h2 class="h4 pb-2 mb-4 border-bottom border-secondary-subtle text-body-emphasis">
+                    {{ kategoria }}
+                    <span class="badge bg-secondary fs-6 align-middle ms-2">{{ clanky_v_kategorii|length }}</span>
+                </h2>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    {% for clanok in clanky_v_kategorii %}
+                    <div class="col article-card-wrapper" data-sentiment="{{ clanok.sentiment|lower }}">
+                        <article class="card h-100 border-0 shadow-sm hover-card border-start border-4 {% if clanok.sentiment|lower == 'pozitívny' %}border-success{% elif clanok.sentiment|lower == 'neutrálny' %}border-warning{% else %}border-danger{% endif %}">
+                            <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
+                                <span class="date-badge"><i class="bi bi-calendar3"></i> {{ clanok.datum_publikovania }}</span>
+                                
+                                {% if clanok.sentiment|lower == 'pozitívny' %}
+                                    <span class="badge bg-success-subtle text-success-emphasis rounded-pill"><i class="bi bi-emoji-smile"></i></span>
+                                {% elif clanok.sentiment|lower == 'neutrálny' %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill"><i class="bi bi-emoji-neutral"></i></span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill"><i class="bi bi-emoji-frown"></i></span>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">
+                                    <a href="{{ clanok.link }}" target="_blank" class="text-decoration-none text-body-emphasis stretched-link">
+                                        {{ clanok.nadpis }}
+                                    </a>
+                                </h5>
+                                <p class="card-text text-body-secondary small">{{ clanok.zhrnutie }}</p>
+                            </div>
+                            <div class="card-footer bg-transparent border-0 pb-3 pt-0">
+                                <a href="{{ clanok.link }}" target="_blank" class="btn-read-more position-relative z-2">
+                                    Prečítať celý článok <i class="bi bi-arrow-right ms-2"></i>
+                                </a>
+                            </div>
+                        </article>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% else %}
+            <div class="text-center py-5">
+                <div class="mb-3 text-body-secondary"><i class="bi bi-inbox fs-1"></i></div>
+                <h3 class="text-body-emphasis">Žiadne správy na dnes</h3>
+                <p class="text-body-secondary">Spustite skript `spracuj_clanky.py` pre načítanie nových správ.</p>
+            </div>
+        {% endfor %}
+        </div>
+
+    </main>
+
+    <footer class="bg-dark text-light py-5 mt-auto">
+        <div class="container">
+            <div class="row gy-4">
+                <div class="col-md-6 mb-3">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-newspaper me-2"></i>Správy Dňa</h5>
+                    <p class="text-secondary small mb-0">Projekt pre automatizovaný zber a analýzu správ pomocou AI.</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-uppercase text-secondary mb-3 small fw-bold">Zdroje</h6>
+                    <ul class="list-unstyled d-flex flex-wrap gap-3">
+                        {% for url, info in zdroje.items() %}
+                        <li>
+                            <a href="{{ url }}" target="_blank" class="link-secondary text-decoration-none small">
+                                <i class="bi bi-link-45deg"></i> {{ info.kategoria }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <hr class="border-secondary my-4 opacity-25">
+            <div class="text-center text-secondary small">
+                &copy; {{ now().year }}
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Dark Mode Logic
+            const themeToggle = document.getElementById('theme-toggle');
+            const icon = themeToggle.querySelector('i');
+            
+            // Načítanie existujúcej témy alebo systémovej preferencie
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-bs-theme', savedTheme);
+                updateIcon(savedTheme);
+            } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+                updateIcon('dark');
+            }
+
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-bs-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                updateIcon(newTheme);
+            });
+
+            function updateIcon(theme) {
+                if (theme === 'dark') {
+                    icon.className = 'bi bi-sun-fill';
+                    themeToggle.setAttribute('title', 'Prepnúť svetlý režim');
+                } else {
+                    icon.className = 'bi bi-moon-stars-fill';
+                    themeToggle.setAttribute('title', 'Prepnúť tmavý režim');
+                }
+            }
+
+            // Filter Logic
+            const filterCheckboxes = document.querySelectorAll('.filter-btn');
+            function applyFilters() {
+                const activeSentiments = Array.from(filterCheckboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+
+                // Filtrovanie článkov
+                const articles = document.querySelectorAll('.article-card-wrapper');
+                articles.forEach(article => {
+                    const sentiment = article.getAttribute('data-sentiment');
+                    const shouldShow = activeSentiments.includes(sentiment);
+                    
+                    // Použijeme d-none bootstrap triedu pre skrytie, ale musíme dať pozor na kolíziu s "col"
+                    if (shouldShow) {
+                        article.classList.remove('d-none');
+                    } else {
+                        article.classList.add('d-none');
+                    }
+                });
+
+                // Skrývanie prázdnych kategórií
+                const categories = document.querySelectorAll('.category-section');
+                categories.forEach(category => {
+                    // Hľadáme viditeľné články v rámci kategórie (tie čo nemajú triedu d-none)
+                    const visibleArticles = category.querySelectorAll('.article-card-wrapper:not(.d-none)');
+                    if (visibleArticles.length > 0) {
+                        category.classList.remove('d-none');
+                    } else {
+                        category.classList.add('d-none');
+                    }
+                });
+            }
+
+            filterCheckboxes.forEach(cb => {
+                cb.addEventListener('change', applyFilters);
+            });
+            
+            // Initial apply
+            applyFilters();
+        });
+    </script>
+</body>
+</html>

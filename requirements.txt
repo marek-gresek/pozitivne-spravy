@@ -1,0 +1,15 @@
+# Pre Štýl B (sumarizácie, generovanie skriptov)
+google-generativeai
+google-genai
+
+# Pre Štýl A (podcasty)
+google-cloud-aiplatform
+
+# Ostatné knižnice
+feedparser
+requests
+beautifulsoup4
+flask
+
+# Produkčný server
+gunicorn
