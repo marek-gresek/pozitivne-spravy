@@ -1,4 +1,4 @@
-# 📰 Správy Dňa (Positívne Správy)
+# 📰 Správy Dňa (Pozitívne Správy)
 
 ![Status](https://img.shields.io/badge/Status-Stable-success)
 ![License](https://img.shields.io/badge/License-MIT-blue)
@@ -52,7 +52,7 @@ Tento projekt vznikol s cieľom filtrovať informačný šum a prinášať vyvá
 
 ### 1. Klonovanie repozitára
 ```bash
-git clone https://github.com/marek-gresek/positivne-spravy.git
+git clone https://github.com/marek-gresek/pozitivne-spravy.git
 cd pozitivne-spravy
 ```
 
@@ -99,7 +99,7 @@ docker-compose up -d --build
 ## 📂 Štruktúra Projektu
 
 ```
-positivne-spravy/
+pozitivne-spravy/
 ├── app.py                 # Hlavná Flask aplikácia (Web)
 ├── spracuj_clanky.py      # Skript na sťahovanie, preklad a analýzu správ
 ├── script_podcast.py      # Generovanie textových scenárov pre podcast
