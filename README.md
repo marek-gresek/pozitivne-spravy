@@ -1,141 +1,137 @@
-# 📰 Správy Dňa (Pozitívne Správy)
+# Pozitívne správy · V2
 
-![Status](https://img.shields.io/badge/Status-Stable-success)
-![License](https://img.shields.io/badge/License-MIT-blue)
-![Backend](https://img.shields.io/badge/Backend-Python%20%7C%20Flask-yellow)
-![Frontend](https://img.shields.io/badge/Frontend-Bootstrap%205-purple)
-![AI](https://img.shields.io/badge/AI-Google%20Gemini-orange)
+Slovenský čitateľský web, ktorý zbiera správy z RSS, pripravuje krátke slovenské súhrny pomocou **OpenAI API** a ponúka dva denné podcasty. Pozitívne, neutrálne a negatívne udalosti majú vlastné farby, smajlíky a štatistiky. Sami si vyberiete, čo chcete čítať.
 
-> **Automatizovaný zberateľ správ, ktorý pomocou umelej inteligencie hľadá pozitivitu v mori informácií a mení články na každodenný podcast.**
+**[Živý web](https://news.mhomeslab.com/)** · **[O projekte](https://news.mhomeslab.com/o-projekte)** · **[Vydania](https://github.com/marek-gresek/pozitivne-spravy/releases)** · **[MIT licencia](LICENSE)**
 
-## 📖 O Projekte
+## Ako vyzerá V2
 
-Tento projekt vznikol s cieľom filtrovať informačný šum a prinášať vyvážený prehľad správ. Automaticky sťahuje články z rôznych RSS kanálov (slovenské, české, anglické), pomocou **Google Gemini AI** ich prekladá do slovenčiny, analyzuje ich sentiment (pozitívny/neutrálny/negatívny) a vytvára stručné zhrnutia.
+### Prehľad na počítači a prehrávač s kapitolami
 
-Čerešničkou na torte je **generovanie vlastného denného podcastu**. AI moderátor vám každé ráno prečíta prehľad toho najdôležitejšieho (alebo len toho pozitívneho), takže nemusíte tráviť hodiny scrollovaním. Celé riešenie je zabalené v Dockeri a optimalizované pre beh na nízko-nákladovom hardvéri ako **Raspberry Pi**.
+![Pozitívne správy V2 – široký prehľad, sentimentové štatistiky a podcastové kapitoly](docs/screenshots/desktop.png)
 
-## ✨ Kľúčové Funkcie
+### Mobilné ovládanie
 
-*   **🌍 Multi-jazyčný Zber:** Sťahuje správy zo SK, CZ a EN zdrojov a automaticky ich prekladá do slovenčiny.
-*   **🧠 AI Analýza Sentimentu:** Každý článok je vyhodnotený umelou inteligenciou, či je pozitívny, neutrálny alebo negatívny. 😊
-*   **🎙️ Generovanie Podcastov:** Automatická tvorba MP3 podcastov s prirodzeným hlasom (Text-to-Speech) – osobitne pre pozitívne správy a pre všeobecný prehľad. 🎧
-*   **📊 Interaktívny Dashboard:** Moderné webové rozhranie (Bootstrap 5) s grafmi, filtrami a Dark Mode režimom. 🌒
-*   **⚡ Optimalizovaný Výkon:** Lokálna SQLite databáza, logovanie a efektívne využívanie API kvót.
-*   **🐳 Docker & Automatizácia:** Plne kontajnerizované riešenie s automatickým spúšťaním úloh (Cron).
+<img src="docs/screenshots/mobile.png" alt="Mobilné filtre so smajlíkmi a prehrávač podcastu s kapitolami" width="360">
 
-## 🛠️ Technologický Zásobník (Tech Stack)
+Screenshoty zachytávajú verejné rozhranie; počty správ sa priebežne menia.
 
-### Backend
-*   **Jazyk:** [Python 3.11](https://www.python.org/)
-*   **Framework:** [Flask](https://flask.palletsprojects.com/) (ľahký webový server)
-*   **Server:** Gunicorn (produkčný WSGI server)
-*   **Databáza:** SQLite (rýchla, súborová databáza bez nutnosti konfigurácie)
-*   **AI Engine:** [Google Gemini API](https://ai.google.dev/) (modely `gemini-2.5-flash` pre text a `gemini-tts` pre audio)
-*   **Plánovanie:** Cron (Linux task scheduler)
+## Čo projekt robí
 
-### Frontend
-*   **Framework:** [Bootstrap 5.3](https://getbootstrap.com/) (Responzívny dizajn)
-*   **Templating:** Jinja2 (Flask šablóny)
-*   **Ikony:** Bootstrap Icons
-*   **Štýl:** Custom CSS s prvkami Glassmorphismu a animáciami
+- Zbiera články z 24 slovenských, českých a anglických RSS kanálov; nové správy kontroluje každé dve hodiny.
+- Pomocou OpenAI API vytvorí slovenský titulok, súhrn, sentiment s vysvetlením, tému, štítky, osoby, organizácie a miesta.
+- Ponúka kombinované filtre, vyhľadávanie, textový archív a detail s odkazom na originál. Filtre aj stránkovanie sa dajú zdieľať cez URL.
+- Každý sentiment má samostatné stránkovanie: pri troch neprázdnych kategóriách po 10 článkoch, pri dvoch po 15 a pri jednej 30.
+- Zobrazuje dva denné podcasty: pozitívny výber a všeobecný prehľad. Scenáre vznikajú cez OpenAI API; hlas vytvára lokálny **Piper**.
+- Prehrávač podporuje kapitoly, preskakovanie, posúvanie, rýchlosť a pokračovanie pri navigácii. Po úplnom obnovení stránky sa obnoví pozícia bez automatického prehrávania.
+- Audio je skutočné MP3, mono, 64 kb/s. Po **14 dňoch** sa odstráni; prepis, kapitoly a zdrojové odkazy zostávajú.
+- Má responzívny vzhľad, svetlú a tmavú tému a súkromnú administráciu so stavom fronty, zdrojov, tokenov a úložiska.
 
-### DevOps & Deployment
-*   **Kontajnerizácia:** Docker & Docker Compose
-*   **Platforma:** Raspberry Pi / Ubuntu Server / macOS
+Automatická analýza sa môže pomýliť. Sentiment opisuje udalosť, nie kvalitu média. Úplný kontext treba hľadať v pôvodnom článku.
 
-## 🚀 Spustenie projektu lokálne (Getting Started)
+## Architektúra
 
-### Predpoklady
-*   Python 3.11+
-*   Git
-*   [Google Gemini API Key](https://aistudio.google.com/app/apikey) (Zadarmo)
+```text
+RSS → kontrola duplicít → extrakcia článku → trvalá fronta
+                                              ↓
+                                      OpenAI Responses API
+                                              ↓
+                                       SQLite + FTS
+                                      ↙           ↘
+                               Flask web      podcastový scenár
+                                                    ↓
+                                              Piper → MP3
+```
 
-### 1. Klonovanie repozitára
-```bash
+Docker Compose spúšťa **web, jedného pracovníka a interný Piper**. SQLite s WAL je jediný zdroj pravdy. Verejné čítanie, filtre, kapitoly a vyhľadávanie nevyvolávajú AI požiadavky. Webová služba nemá pripojený API kľúč.
+
+Textová pipeline používa `gpt-6-luna` na bežnú analýzu a `gpt-6.1-sol` na opravy a scenáre, vždy `reasoning.effort: high`. Nasadenie vyžaduje prístup k týmto identifikátorom modelov; ich dostupnosť vo vašom účte si overte pred spustením pracovníka. Modely mimo tohto zoznamu aplikácia odmietne.
+
+Úsporné spracovanie zahŕňa podmienené RSS požiadavky, normalizáciu URL, odtlačky textov, dávky najviac po ôsmich a jeden spoločný výsledok analýzy. Opravia sa iba neúspešné položky. Stream musí byť kompletný a JSON výsledok lokálne overený. Kvóta spracovanie odloží a fronta zostane zachovaná; dočasné chyby majú najviac dva opravné pokusy. Historický archív sa automaticky neposiela znovu na AI.
+
+## Spustenie
+
+Potrebujete Docker s Compose, OpenAI API kľúč s prístupom k nakonfigurovaným modelom a dostatok miesta na hlasový model a pracovné audio. Pri prvom zostavení sa stiahne slovenský hlas `sk_SK-lili-medium`.
+
+```sh
 git clone https://github.com/marek-gresek/pozitivne-spravy.git
 cd pozitivne-spravy
-```
-
-### 2. Nastavenie prostredia
-Vytvorte súbor `.env` podľa vzoru `.env.example`:
-```bash
 cp .env.example .env
-```
-Otvorte súbor `.env` a vložte svoje API kľúče:
-```env
-GEMINI_API_KEY=vys_tajny_kluc_z_google_ai_studio
-GEMINI_PODCAST_API_KEY=tvoj_tajny_kluc_z_google_ai_studio
+mkdir -p secrets data
+chmod 700 secrets
 ```
 
-### 3. Inštalácia a spustenie (bez Dockeru)
-```bash
-# Vytvorenie virtuálneho prostredia
-python -m venv .venv
-source .venv/bin/activate  # Na Windows: .venv\Scripts\activate
+Do súboru **`secrets/ai_key`** bezpečne vložte svoj OpenAI API kľúč. Nevkladajte ho do zdrojového kódu, README, príkazovej histórie ani issue. Potom nastavte práva:
 
-# Inštalácia závislostí
-pip install -r requirements.txt
-
-# Spustenie prvotného spracovania (stiahnutie správ)
-python spracuj_clanky.py
-
-# Spustenie webového servera
-python app.py
-```
-Aplikácia pobeží na: `http://localhost:5001`
-
-## 🐳 Nasadenie pomocou Dockeru (Odporúčané)
-
-Toto je preferovaný spôsob pre produkciu a Raspberry Pi.
-
-1.  Uistite sa, že máte vyplnený súbor `.env`.
-2.  Spustite kontajnery:
-```bash
-docker-compose up -d --build
-```
-3.  Webová aplikácia bude dostupná na `http://localhost:5001`.
-4.  Proces sťahovania správ a generovania podcastov sa spustí automaticky podľa plánu (predvolene 09:00 ráno), alebo ho môžete vynútiť reštartom kontajnera `scheduler`.
-
-## 📂 Štruktúra Projektu
-
-```
-pozitivne-spravy/
-├── app.py                 # Hlavná Flask aplikácia (Web)
-├── spracuj_clanky.py      # Skript na sťahovanie, preklad a analýzu správ
-├── script_podcast.py      # Generovanie textových scenárov pre podcast
-├── vytvor_podcasty.py     # Prevod textu na reč (MP3)
-├── database.py            # Práca s SQLite databázou
-├── config.py              # Konfigurácia a zoznam RSS kanálov
-├── run_tasks.sh           # Bash skript spúšťajúci celý proces (pre Cron)
-├── clanky.db              # SQLite databáza (vytvorí sa automaticky)
-├── requirements.txt       # Zoznam Python knižníc
-├── Dockerfile             # Definícia Docker obrazu
-├── docker-compose.yml     # Orchestrácia kontajnerov (App + Scheduler)
-├── templates/             # HTML šablóny (Jinja2)
-│   └── index.html
-└── static/                # CSS, obrázky a vygenerované MP3
-    ├── style.css
-    ├── podcast_pozitivny.mp3
-    └── ...
+```sh
+chmod 600 secrets/ai_key
 ```
 
-## 🤝 Prispievanie (Contributing)
+V `.env` nastavte náhodný `SECRET_KEY`. Môžete ho vygenerovať napríklad lokálne cez Python; výsledok uchovajte len v súkromnom `.env`:
 
-Príspevky sú vítané! Ak máte nápad na vylepšenie, neváhajte otvoriť Issue alebo poslať Pull Request.
-1.  Forknite repozitár.
-2.  Vytvorte si vlastnú vetvu (`git checkout -b feature/NovyFeature`).
-3.  Commitnite zmeny (`git commit -m 'Pridanie novej funkcie'`).
-4.  Pushnite do vetvy (`git push origin feature/NovyFeature`).
-5.  Otvorte Pull Request.
+```sh
+python3 -c 'import secrets; print(secrets.token_hex(32))'
+docker compose up -d --build
+```
 
-## 📄 Licencia
+Web bude dostupný na **http://127.0.0.1:5001**. Predvolená adresa OpenAI Responses API je `https://api.openai.com/v1/responses`. Skutočné kľúče a prevádzkové nastavenia sú lokálne a nepatria do Gitu. Pri prvom spustení začne pracovník spracúvať frontu; web dovtedy zobrazuje dostupný obsah a stav čakania.
 
-Tento projekt je licencovaný pod licenciou **MIT** - pozrite si súbor [LICENSE](LICENSE) pre viac detailov.
+### Súkromná administrácia
 
-## 👤 Autor
+`/admin` vyžaduje Cloudflare Access. V `.env` nastavte vlastné `CF_ACCESS_TEAM`, `CF_ACCESS_AUD` a `SECRET_KEY`. Server overuje podpis RS256, vydavateľa, publikum, platnosť a subjekt JWT; samotná emailová hlavička nestačí. Bez konfigurácie je administrácia uzavretá. Zmeny fronty vyžadujú CSRF token.
 
-**Marek Grešek**
-*   GitHub: [marek-gresek](https://github.com/marek-gresek)
+Ak web zverejňujete, použite HTTPS a nakonfigurujte ochranu administrácie. Verejný reverzný proxy pripájajte k lokálnemu portu; interný Piper nevystavujte na internet.
 
----
-*Vyrobené s ❤️ a trochou AI*
+### Plánovanie a retencia
+
+- RSS: každé dve hodiny.
+- Obe epizódy: po 09:00 `Europe/Prague`, zo správ predchádzajúceho kalendárneho dňa. Nevybavené dni zostávajú v trvalej fronte aj po výpadku.
+- Scenár: najviac 15 lokálne vybraných rozmanitých tém; pri malom počte správ kratšie vydanie.
+- Audio: nedostupné po 14 dňoch od publikovania, fyzické čistenie každú hodinu, vrátane poslednej epizódy.
+- Opustené pracovné audio: čistenie po 24 hodinách, aktívne generovanie je chránené zámkom.
+- Databázové zálohy: denne, uchovanie 14 dní, bez MP3.
+
+Čistenie pracuje len vo vyhradenom adresári a nenasleduje symbolické odkazy. Expirované audio sa neponúka ani pri zlyhaní fyzického mazania. Textové dáta zostávajú zachované.
+
+### Diagnostika
+
+`/healthz` kontroluje web a `/readyz` pripravenosť databázy. Administrácia ukazuje aj vstupné, výstupné, cached a reasoning tokeny. Cached tokeny sú súčasťou vstupu a reasoning tokeny sú súčasťou výstupu; do celkového súčtu sa nepripočítavajú druhýkrát. Cena závisí od dostupných modelov a vašej tarify OpenAI API.
+
+Pred ručnými úlohami zastavte pracovníka, aby ste nevytvorili druhý súbežný proces:
+
+```sh
+docker compose stop worker
+docker compose run --rm --no-deps worker python worker.py collect
+docker compose run --rm --no-deps worker python worker.py process --batches 1
+docker compose run --rm --no-deps worker python worker.py cleanup
+docker compose start worker
+```
+
+Ručné vytvorenie epizód podporuje `python worker.py podcasts --day YYYY-MM-DD`. Úlohy `process` a `podcasts` používajú OpenAI API a môžu spotrebovať platené tokeny; `collect` a `cleanup` textovú AI nevolajú.
+
+## Vývoj a testy
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest -q
+```
+
+Pre testy skutočného MP3 musí byť nainštalovaný `ffmpeg`. Testy AI používajú simulované odpovede a nepotrebujú reálny kľúč ani platené volania. Pokrývajú streamovanie, validáciu, tokeny, migráciu, duplicity, frontu, reštart, FTS, filtre, samostatné stránkovanie, autentifikáciu, CSRF, kapitoly a bezpečnú audio retenciu. CI kontroluje testy aj tajomstvá v histórii Gitu.
+
+V2 je nová implementácia webu aj spracovania. `migrate.py` pridáva databázovú schému bez automatickej opätovnej analýzy archívu. Pôvodné spúšťacie skripty zostávajú kompatibilnými vstupmi do pracovníka. Pred prechodom z V1 zastavte starý plánovač a zálohujte databázu.
+
+## Obmedzenia
+
+- Kvalita extrakcie závisí od dostupnosti zdroja; pri použití iba RSS výňatku je článok označený.
+- AI hodnotenie a súhrny potrebujú redakčnú kontrolu. Projekt nie je nezávislé overovanie pravdivosti správ.
+- Lokálny hlas Piper môže znieť synteticky. V2 nesľubuje kvalitu ľudského moderátora.
+- Docker pamäťové limity závisia od podpory hostiteľa. Procesový limit virtuálnej pamäte nenahrádza súhrnný limit RAM kontajnera.
+- Zdrojový kód neobsahuje živú databázu, článkový archív, audio, súkromnú konfiguráciu ani API kľúče.
+
+## Príspevky a licencia
+
+Nápady a opravy sú vítané cez issues a pull requesty. Pred odoslaním spustite testy a kontrolu tajomstiev podľa [SECURITY.md](SECURITY.md). Bezpečnostný problém s reálnym kľúčom neoznamujte verejným issue.
+
+Kód projektu: **[MIT](LICENSE)**, Marek Grešek. Lokálne fonty Inter a Newsreader majú vlastné SIL Open Font License v `static/fonts/`. Hlasový model Piper má samostatné podmienky uvedené v [modelovej karte Lili](https://huggingface.co/rhasspy/piper-voices/blob/main/sk/sk_SK/lili/medium/MODEL_CARD); nespadá pod MIT licenciu tohto repozitára. Pôvodné články zostávajú obsahom príslušných vydavateľov.

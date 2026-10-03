@@ -1,12 +1,19 @@
 import os
-
-# Načítanie API kľúčov z premenných prostredia (Environment Variables)
-# Ak premenná nie je nastavená, použije sa prázdny reťazec alebo vyhodí chybu (podľa potreby)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_PODCAST_API_KEY = os.getenv("GEMINI_PODCAST_API_KEY", "")
-
-if not GEMINI_API_KEY:
-    print("VAROVANIE: GEMINI_API_KEY nie je nastavený! Skontrolujte .env súbor.")
+from pathlib import Path
+AI_ENDPOINT = os.getenv("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses")
+ALLOWED_MODELS = ("gpt-6-luna", "gpt-6.1-sol")
+ARTICLE_MODEL = "gpt-6-luna"
+EDITOR_MODEL = "gpt-6.1-sol"
+ANALYSIS_VERSION = "2.0"
+TIMEZONE = "Europe/Prague"
+AUDIO_DIR = Path(os.getenv("AUDIO_DIR", "data/audio"))
+TEMP_AUDIO_DIR = AUDIO_DIR / "tmp"
+AUDIO_RETENTION_DAYS = 14
+PIPER_URL = os.getenv("PIPER_URL", "http://piper:5000")
+KEY_FILE = os.getenv("AI_KEY_FILE", "/run/secrets/ai_key")
+USER_AGENT = "PozitivneSpravy/2.0"
+TOPICS = ["Politika a verejné dianie", "Ekonomika", "Veda a technológie", "Zdravie", "Životné prostredie", "Spoločnosť", "Vzdelávanie", "Kultúra", "Šport", "Ostatné"]
+SENTIMENTS = ["Pozitívny", "Neutrálny", "Negatívny"]
 
 RSS_FEEDS = {
     # Slovenské (sk)

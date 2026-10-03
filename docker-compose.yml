@@ -1,30 +1,56 @@
+name: pozitivne-spravy-v2
 services:
   app:
     build: .
-    container_name: pozitivne_spravy_app
-    restart: always
+    image: pozitivne-spravy:2
+    restart: unless-stopped
     ports:
-      - "5001:5001"
-    # Načítanie premenných z .env súboru
-    env_file:
-      - .env
+      - "${BIND_HOST:-127.0.0.1}:${WEB_PORT:-5001}:5001"
+    env_file: .env
+    environment:
+      DB_FILE: /data/clanky.db
+      AUDIO_DIR: /data/audio
+      TZ: Europe/Prague
+      MEMORY_CEILING_MB: 768
     volumes:
-      - ./clanky.db:/app/clanky.db
-      - ./spracovanie.log:/app/spracovanie.log
-      - ./static/podcast_pozitivny.mp3:/app/static/podcast_pozitivny.mp3
-      - ./static/podcast_vsetky.mp3:/app/static/podcast_vsetky.mp3
-    command: gunicorn --bind 0.0.0.0:5001 app:app
-
-  scheduler:
-    build: .
-    container_name: pozitivne_spravy_scheduler
-    restart: always
-    # Aj scheduler potrebuje API kľúč
-    env_file:
-      - .env
+      - ./data:/data
+    mem_limit: 512m
+    cpus: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/readyz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  worker:
+    image: pozitivne-spravy:2
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_FILE: /data/clanky.db
+      AUDIO_DIR: /data/audio
+      PIPER_URL: http://piper:5000
+      AI_KEY_FILE: /run/secrets/ai_key
+      TZ: Europe/Prague
+      MEMORY_CEILING_MB: 1536
     volumes:
-      - ./clanky.db:/app/clanky.db
-      - ./spracovanie.log:/app/spracovanie.log
-      - ./static:/app/static
-    # Spustí cron v popredí
-    command: cron -f
+      - ./data:/data
+      - ./secrets/ai_key:/run/secrets/ai_key:ro
+    command: python bounded_service.py python worker.py run
+    depends_on:
+      app:
+        condition: service_healthy
+      piper:
+        condition: service_started
+    mem_limit: 1g
+    cpus: 1
+  piper:
+    build:
+      context: .
+      dockerfile: Dockerfile.piper
+    image: pozitivne-spravy-piper:2
+    restart: unless-stopped
+    expose: ["5000"]
+    environment:
+      MEMORY_CEILING_MB: 2048
+    mem_limit: 1g
+    cpus: 1

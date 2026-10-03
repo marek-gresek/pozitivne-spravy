@@ -1,15 +1,7 @@
-# Pre Štýl B (sumarizácie, generovanie skriptov)
-google-generativeai
-google-genai
-
-# Pre Štýl A (podcasty)
-google-cloud-aiplatform
-
-# Ostatné knižnice
-feedparser
-requests
-beautifulsoup4
-flask
-
-# Produkčný server
-gunicorn
+Flask>=3.1,<4
+requests>=2.32,<3
+feedparser>=6.0,<7
+beautifulsoup4>=4.13,<5
+trafilatura>=2.0,<3
+PyJWT[crypto]>=2.10,<3
+gunicorn>=23,<26

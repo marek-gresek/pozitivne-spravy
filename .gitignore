@@ -1,5 +1,15 @@
 # Environment variables (Sensitive!)
 .env
+.env.*
+!.env.example
+secrets/
+data/
+backups/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
 
 # Python
 __pycache__/
@@ -33,6 +43,9 @@ ENV/
 # Database
 *.db
 *.sqlite3
+*.sqlite
+*.db-*
+*.sqlite*-*
 
 # Logs
 *.log
@@ -40,7 +53,14 @@ logs/
 
 # Generated content (Podcasts, Scripts)
 static/*.mp3
+*.mp3
+*.wav
+*.ogg
+*.flac
 script_*.txt
+.pytest_cache/
+.coverage*
+htmlcov/
 
 # OS Files
 .DS_Store
