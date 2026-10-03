@@ -1,5 +1,6 @@
 """Minimal Slovak reader and private operations view."""
 import hmac
+import hashlib
 import json
 import os
 import re
@@ -19,6 +20,39 @@ from security import access_required
 from web_queries import ARTICLE_COLUMNS, article, json_list, list_articles, resolve_reader_ids
 from curation import editorial_status
 from story_groups import group_articles, load_aliases, signature, similar
+
+
+
+# Display metadata only; channel membership always comes from RSS_FEEDS.
+SOURCE_NAMES = {
+    'sme.sk': 'SME', 'dennikn.sk': 'Denník N', 'aktuality.sk': 'Aktuality.sk',
+    'pravda.sk': 'Pravda', 'teraz.sk': 'Teraz.sk', 'etrend.sk': 'TREND',
+    'zilinak.sk': 'Žilinak.sk', 'zive.aktuality.sk': 'Živé.sk',
+    'feeds.bbci.co.uk': 'BBC News', 'goodnewsnetwork.org': 'Good News Network',
+    'positive.news': 'Positive News', 'optimistdaily.com': 'The Optimist Daily',
+    'goodgoodgood.co': 'Good Good Good', 'reasonstobecheerful.world': 'Reasons to be Cheerful',
+    'servis.idnes.cz': 'iDNES.cz',
+}
+SOURCE_WEBS = {'pravda.sk': 'https://spravy.pravda.sk/',
+               'feeds.bbci.co.uk': 'https://www.bbc.com/news',
+               'servis.idnes.cz': 'https://www.idnes.cz/zpravy'}
+
+def rss_directory():
+    languages = {'sk': 'Slovenské médiá', 'cs': 'České médiá', 'en': 'Zahraničné médiá'}
+    groups = {key: {} for key in languages}
+    for url, meta in config.RSS_FEEDS.items():
+        host = (urlsplit(url).hostname or '').removeprefix('www.')
+        key = 'pravda.sk' if host.endswith('.pravda.sk') else host
+        language = meta['jazyk']
+        sources = groups.setdefault(language, {})
+        source = sources.setdefault(key, {'name': SOURCE_NAMES.get(key, host),
+            'web': SOURCE_WEBS.get(key, 'https://' + (urlsplit(url).hostname or host) + '/'), 'feeds': []})
+        label = meta['kategoria']
+        if key == 'goodnewsnetwork.org': label = 'Správy' if '/category/news/' in url else 'Všetky články'
+        if key == 'zive.aktuality.sk': label = 'Veda a technológie'
+        source['feeds'].append({'url': url, 'label': label})
+    return [{'label': languages.get(language, 'Ďalšie médiá'), 'sources': list(sources.values())}
+            for language, sources in groups.items() if sources]
 
 
 def parsed_time(value):
@@ -51,6 +85,8 @@ def episode_view(row):
 
 def create_app():
     app = Flask(__name__)
+    app.jinja_env.globals['asset_versions'] = {name: hashlib.sha256((Path(app.static_folder) / name).read_bytes()).hexdigest()[:12]
+        for name in ('style.css', 'reader.js', 'app.js')}
     # The immediate Cloudflare tunnel forwards the original public scheme.
     # Identity is independently verified by signed Access JWTs, never proxy headers.
     app.wsgi_app = ProxyFix(app.wsgi_app,x_for=0,x_proto=1,x_host=0,x_port=0,x_prefix=0)
@@ -126,7 +162,10 @@ def create_app():
         return render_template('article.html', item=item,aliases=aliases,related_items=group['story_members'],related_sources=group['story_sources'] if related else [])
 
     @app.get('/o-projekte')
-    def about(): return render_template('about.html')
+    def about():
+        groups = rss_directory()
+        return render_template('about.html', source_groups=groups, channel_count=len(config.RSS_FEEDS),
+                               source_count=sum(len(group['sources']) for group in groups))
 
     @app.get('/podcasty/<episode_id>/kapitoly.json')
     def podcast_chapters(episode_id):

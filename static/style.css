@@ -769,3 +769,15 @@ body[data-reader-density="compact"] .mood-group .story-group{margin-bottom:10px}
 .highlight-intro p{max-width:65ch;color:var(--ink-3);margin:8px 0}
 .highlight-intro a{flex-shrink:0;min-height:44px;display:inline-flex;align-items:center}
 @media(max-width:720px){.highlight-intro{align-items:flex-start;flex-direction:column;gap:8px}.highlight-intro h2{font-size:24px}}
+
+/* Public source directory, using the existing reading palette. */
+.about-sources{margin-top:32px}
+.about-sources h2{margin:0 0 10px;font-size:22px}
+.about-sources>p{font-size:18px;line-height:1.7;color:var(--ink-2)}
+.about-sources h3{margin:24px 0 8px;font-size:18px}
+.about-source-list{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:0;padding:0}
+.about-source-list>li{padding:16px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.about-source-name{font-size:18px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.about-source-feeds{list-style:none;display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;padding:0;font-size:14px;line-height:1.6;color:var(--ink-2)}
+.about-source-feeds a{text-decoration:underline;text-underline-offset:3px}
+@media(max-width:600px){.about-source-list{grid-template-columns:1fr}.about-sources>p{font-size:17px}}
