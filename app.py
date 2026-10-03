@@ -16,7 +16,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import database
 import config
 from security import access_required
-from web_queries import article, json_list, list_articles
+from web_queries import ARTICLE_COLUMNS, article, json_list, list_articles
+from story_groups import group_articles, load_aliases, signature, similar
 
 
 def parsed_time(value):
@@ -80,6 +81,9 @@ def create_app():
         response.headers['Referrer-Policy']='strict-origin-when-cross-origin'
         response.headers['Content-Security-Policy']="default-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
         if request.path.startswith('/admin'): response.headers['Cache-Control']='no-store'
+        if request.path == '/ulozene':
+            response.headers['Cache-Control']='private, no-store'
+            for number in range(1,6): response.vary.add('X-Saved-Articles' + (f'-{number}' if number>1 else ''))
         return response
 
     @app.get('/')
@@ -95,13 +99,29 @@ def create_app():
     @app.get('/archiv')
     def archive(): return render_template('index.html', **list_articles(request.args,archive=True))
 
+    @app.get('/ulozene')
+    def saved():
+        # Preferences belong to the browser. IDs never become a server-side user profile.
+        chunks = [request.headers.get('X-Saved-Articles' + (f'-{number}' if number>1 else ''), '') for number in range(1,6)]
+        if any(len(chunk)>6000 for chunk in chunks): abort(400)
+        raw = ','.join(chunk for chunk in chunks if chunk)
+        if len(raw) > 24500: abort(400)
+        ids = list(dict.fromkeys(raw.split(','))) if raw else []
+        if len(ids) > 300 or any(not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', value) for value in ids): abort(400)
+        return render_template('index.html', **list_articles(request.args,archive=True,saved_ids=ids))
+
     @app.get('/clanok/<article_id>')
     def detail(article_id):
         with database.connect() as c:
-            row=c.execute('SELECT a.*,s.name source_name FROM clanky a LEFT JOIN sources s ON s.id=a.source_id WHERE a.id=?',(article_id,)).fetchone()
+            row=c.execute('SELECT '+ARTICLE_COLUMNS+',s.name source_name FROM clanky a LEFT JOIN sources s ON s.id=a.source_id WHERE a.id=?',(article_id,)).fetchone()
             if not row: abort(404)
             aliases=[dict(r) for r in c.execute('SELECT al.*,s.name source_name FROM article_aliases al LEFT JOIN sources s ON s.id=al.source_id WHERE article_id=?',(article_id,))]
-        return render_template('article.html', item=article(row),aliases=aliases)
+            item=article(row)
+            candidates=[article(r) for r in c.execute('SELECT '+ARTICLE_COLUMNS+",s.name source_name FROM clanky a LEFT JOIN sources s ON s.id=a.source_id WHERE a.id<>? AND a.sentiment=? AND datetime(a.published_at) BETWEEN datetime(?,'-36 hours') AND datetime(?,'+36 hours') ORDER BY datetime(a.published_at) DESC,a.id DESC",(article_id,item['sentiment'],item['published_at'],item['published_at']))]
+            sig=signature(item)
+            related=[candidate for candidate in candidates if similar(item,candidate,sig,signature(candidate))]
+            group=group_articles([item]+related, load_aliases(c,[item['id']]+[candidate['id'] for candidate in related]))[0]
+        return render_template('article.html', item=item,aliases=aliases,related_items=group['story_members'],related_sources=group['story_sources'] if related else [])
 
     @app.get('/o-projekte')
     def about(): return render_template('about.html')

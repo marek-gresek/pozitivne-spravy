@@ -147,7 +147,7 @@
 (() => {
   'use strict';
   if (!window.fetch || !window.AbortController || !document.getElementById('main')) return;
-  const publicPath = path => path === '/' || path === '/archiv' || path === '/o-projekte' || /^\/podcasty(?:\/[^/]+)?$/.test(path) || /^\/clanok\/[^/]+$/.test(path);
+  const publicPath = path => path === '/' || path === '/archiv' || path === '/ulozene' || path === '/o-projekte' || /^\/podcasty(?:\/[^/]+)?$/.test(path) || /^\/clanok\/[^/]+$/.test(path);
   const isPublic = url => url.origin === location.origin && publicPath(url.pathname);
   if (!isPublic(new URL(location.href))) return;
   let renderedURL = new URL(location.href);
@@ -178,6 +178,7 @@
   }, {passive: true});
 
   async function navigate(url, {back = false, state = null, form = false} = {}) {
+    document.dispatchEvent(new CustomEvent('news:navigating'));
     if (!back) saveScroll();
     if (pending) pending.abort();
     const ticket = ++sequence;
@@ -188,7 +189,7 @@
     status.textContent = 'Načítava sa stránka.';
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(url.href, {signal: controller.signal, credentials: 'same-origin', headers: {'Accept': 'text/html'}});
+      const response = await fetch(url.href, {signal: controller.signal, credentials: 'same-origin', headers: {'Accept': 'text/html', ...window.newsReaderHeaders?.(url)}});
       if (!response.ok || !response.headers.get('Content-Type')?.includes('text/html')) throw new Error('navigation_failed');
       const finalURL = new URL(response.url || url.href);
       if (!isPublic(finalURL) || finalURL.hash) throw new Error('unexpected_destination');

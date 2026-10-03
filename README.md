@@ -8,11 +8,15 @@ Slovenský čitateľský web, ktorý zbiera správy z RSS, pripravuje krátke sl
 
 ### Prehľad na počítači a prehrávač s kapitolami
 
-![Pozitívne správy V2 – široký prehľad, sentimentové štatistiky a podcastové kapitoly](docs/screenshots/desktop.png)
+![Pozitívne správy V2 – široký prehľad, sentimentové štatistiky a podcastové kapitoly](docs/screenshots/desktop.jpg)
+
+### Kompaktné čítanie a uloženie na neskôr
+
+![Kompaktné karty, záložky pri článkoch a ovládanie čítania](docs/screenshots/reader-tools.jpg)
 
 ### Mobilné ovládanie
 
-<img src="docs/screenshots/mobile.png" alt="Mobilné filtre so smajlíkmi a prehrávač podcastu s kapitolami" width="360">
+<img src="docs/screenshots/mobile.jpg" alt="Mobilné filtre so smajlíkmi a nové čitateľské ovládanie" width="360">
 
 Screenshoty zachytávajú verejné rozhranie; počty správ sa priebežne menia.
 
@@ -21,7 +25,10 @@ Screenshoty zachytávajú verejné rozhranie; počty správ sa priebežne menia.
 - Zbiera články z 24 slovenských, českých a anglických RSS kanálov; nové správy kontroluje každé dve hodiny.
 - Pomocou OpenAI API vytvorí slovenský titulok, súhrn, sentiment s vysvetlením, tému, štítky, osoby, organizácie a miesta.
 - Ponúka kombinované filtre, vyhľadávanie, textový archív a detail s odkazom na originál. Filtre aj stránkovanie sa dajú zdieľať cez URL.
-- Každý sentiment má samostatné stránkovanie: pri troch neprázdnych kategóriách po 10 článkoch, pri dvoch po 15 a pri jednej 30.
+- Každý sentiment má samostatné stránkovanie: pri troch neprázdnych kategóriách po 10 kartách, pri dvoch po 15 a pri jednej 30.
+- Označí články pridané od poslednej návštevy a umožní označiť novinky ako prečítané. Rozhoduje čas pridania, takže zachytí aj oneskorene spracované články.
+- Ikonou záložky uložíte najviac 300 článkov do sekcie **Uložené**. Zoznam aj kompaktné zobrazenie zostávajú v danom prehliadači, bez účtu a synchronizácie medzi zariadeniami. Vymazanie miestneho úložiska odstráni tieto nastavenia.
+- Lokálne zoskupí veľmi podobné články o jednej udalosti do rozbaliteľnej karty. Zachová všetky články, ich vlastné súhrny a zdroje. Zoskupenie možno vypnúť vo filtroch; štatistiky vždy počítajú články.
 - Zobrazuje dva denné podcasty: pozitívny výber a všeobecný prehľad. Scenáre vznikajú cez OpenAI API; hlas vytvára lokálny **Piper**.
 - Prehrávač podporuje kapitoly, preskakovanie, posúvanie, rýchlosť a pokračovanie pri navigácii. Po úplnom obnovení stránky sa obnoví pozícia bez automatického prehrávania.
 - Audio je skutočné MP3, mono, 64 kb/s. Po **14 dňoch** sa odstráni; prepis, kapitoly a zdrojové odkazy zostávajú.
@@ -44,6 +51,8 @@ RSS → kontrola duplicít → extrakcia článku → trvalá fronta
 ```
 
 Docker Compose spúšťa **web, jedného pracovníka a interný Piper**. SQLite s WAL je jediný zdroj pravdy. Verejné čítanie, filtre, kapitoly a vyhľadávanie nevyvolávajú AI požiadavky. Webová služba nemá pripojený API kľúč.
+
+Čitateľské funkcie tiež nevolajú AI. Zoskupovanie konzervatívne porovnáva titulky, sentiment, tému, miesto, čísla, entity a čas publikovania; neprepisuje databázu. Rôzne sentimenty zostávajú oddelené. Podobnosť nemusí zachytiť všetky súvisiace články a môže sa pomýliť, preto sú pôvodné zdroje aj samostatné detaily vždy dostupné. Pri zozname **Uložené** prehliadač pošle iba vybrané verejné identifikátory v hlavičke požiadavky; odpoveď sa verejne neukladá do cache a server nevytvára profil čitateľa. Na uložené články a pamätanie návštevy je potrebný JavaScript a miestne úložisko.
 
 Textová pipeline používa `gpt-6-luna` na bežnú analýzu a `gpt-6.1-sol` na opravy a scenáre, vždy `reasoning.effort: high`. Nasadenie vyžaduje prístup k týmto identifikátorom modelov; ich dostupnosť vo vašom účte si overte pred spustením pracovníka. Modely mimo tohto zoznamu aplikácia odmietne.
 
@@ -118,7 +127,7 @@ pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest -q
 ```
 
-Pre testy skutočného MP3 musí byť nainštalovaný `ffmpeg`. Testy AI používajú simulované odpovede a nepotrebujú reálny kľúč ani platené volania. Pokrývajú streamovanie, validáciu, tokeny, migráciu, duplicity, frontu, reštart, FTS, filtre, samostatné stránkovanie, autentifikáciu, CSRF, kapitoly a bezpečnú audio retenciu. CI kontroluje testy aj tajomstvá v histórii Gitu.
+Pre testy skutočného MP3 musí byť nainštalovaný `ffmpeg`. Regresný test pamätania návštevy spúšťa produkčný JavaScript cez Node.js; bez Node.js sa tento test preskočí. Testy AI používajú simulované odpovede a nepotrebujú reálny kľúč ani platené volania. Pokrývajú streamovanie, validáciu, tokeny, migráciu, duplicity, frontu, reštart, FTS, filtre, samostatné stránkovanie, autentifikáciu, CSRF, kapitoly a bezpečnú audio retenciu. CI kontroluje testy aj tajomstvá v histórii Gitu.
 
 V2 je nová implementácia webu aj spracovania. `migrate.py` pridáva databázovú schému bez automatickej opätovnej analýzy archívu. Pôvodné spúšťacie skripty zostávajú kompatibilnými vstupmi do pracovníka. Pred prechodom z V1 zastavte starý plánovač a zálohujte databázu.
 
