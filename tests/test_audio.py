@@ -200,7 +200,7 @@ def test_real_mp3_encoder_mono_64k_chapters_and_fourteen_days(audio_db,monkeypat
     assert stream['codec_name']=='mp3' and stream['channels']==1 and int(stream['bit_rate'])==64000
     timeline=json.loads(row['chapters']);assert timeline[0]['start']==0 and timeline[1]['start']>0
     assert timeline[0]['article_ids']==['article'] and 'text' in timeline[0]
-    assert all(c[1]['json']['voice']=='sk_SK-lili-medium' for c in calls)
+    assert all(c[1]['json']['voice']=='M1' for c in calls)
     assert not list(tmp.iterdir())
 
 
@@ -228,7 +228,7 @@ def test_long_sentence_speech_requests_are_bounded(audio_db,monkeypatch):
     root,tmp=audio_db;eid,filename=add_episode(root,status='pending',transcript=None,chapters='[]')
     client,calls=speech_setup(monkeypatch,chapters=[{'title':'Long sentence','text':'A'*5000+'.','article_ids':['article']}])
     assert podcasts.generate_episode(episode(eid),client)
-    assert max(len(kwargs['json']['text']) for _,kwargs in calls)<=1800
+    assert max(len(kwargs['json']['text']) for _,kwargs in calls)<=600
 
 
 def test_abandoned_attempt_uuid_temp_files_are_cleaned(audio_db):
@@ -263,25 +263,20 @@ def private_speech_server(monkeypatch):
     import importlib.util
     import sys
     import types
+    import numpy as np
     options=[];spoken=[]
-    onnx=types.ModuleType('onnxruntime')
-    class Options:pass
-    def inference(path,**kwargs):options.append((path,kwargs));return object()
-    onnx.SessionOptions=Options;onnx.InferenceSession=inference
-    piper=types.ModuleType('piper');configuration=types.ModuleType('piper.config')
-    class Voice:
-        def __init__(self,**kwargs):pass
-        def synthesize_wav(self,text,wav):
-            spoken.append(text);wav.setnchannels(1);wav.setsampwidth(2);wav.setframerate(22050);wav.writeframes(b'\0\0'*100)
-    piper.PiperVoice=Voice
-    configuration.PiperConfig=types.SimpleNamespace(from_dict=lambda value:value)
-    for name,module in [('onnxruntime',onnx),('piper',piper),('piper.config',configuration)]:monkeypatch.setitem(sys.modules,name,module)
-    original_read=Path.read_text
-    def read(path,*args,**kwargs):
-        return '{}' if str(path)=='/voices/sk_SK-lili-medium.onnx.json' else original_read(path,*args,**kwargs)
-    monkeypatch.setattr(Path,'read_text',read)
-    source=Path(__file__).resolve().parent.parent/'piper_server.py'
-    spec=importlib.util.spec_from_file_location('offline_piper_server',source);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    sdk=types.ModuleType('supertonic')
+    class Engine:
+        sample_rate=44100
+        def __init__(self,**kwargs):options.append(kwargs)
+        def get_voice_style(self,name):
+            assert name=='M1';return 'approved-style'
+        def synthesize(self,text,**kwargs):
+            spoken.append((text,kwargs));return np.zeros((1,100)),np.array([100/44100])
+    sdk.TTS=Engine
+    monkeypatch.setitem(sys.modules,'supertonic',sdk)
+    source=Path(__file__).resolve().parent.parent/'tts_server.py'
+    spec=importlib.util.spec_from_file_location('offline_tts_server',source);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     return module.app.test_client(),options,spoken
 
 
@@ -289,18 +284,16 @@ def test_private_fixed_voice_server_returns_actual_wav_and_bounded_cpu_contract(
     import io
     import wave
     client,options,spoken=private_speech_server
-    response=client.post('/synthesize',json={'text':'  Dobrá správa.  ','voice':'sk_SK-lili-medium'})
+    response=client.post('/synthesize',json={'text':'  Dobrá správa.  ','voice':'M1'})
     assert response.status_code==200 and response.mimetype=='audio/wav' and response.data[:4]==b'RIFF'
-    assert spoken==['Dobrá správa.']
-    with wave.open(io.BytesIO(response.data),'rb') as wav:assert wav.getnchannels()==1 and wav.getnframes()==100
-    assert len(options)==1
-    settings=options[0][1]['sess_options']
-    assert settings.intra_op_num_threads==settings.inter_op_num_threads==1
-    assert options[0][1]['providers']==['CPUExecutionProvider']
-    assert client.get('/healthz').json['voice']=='sk_SK-lili-medium'
+    assert spoken==[('Dobrá správa.',{'voice_style':'approved-style','lang':'sk','total_steps':16,'speed':1.0,'silence_duration':0.35})]
+    with wave.open(io.BytesIO(response.data),'rb') as wav:
+        assert wav.getnchannels()==1 and wav.getnframes()==100 and wav.getframerate()==44100
+    assert options==[{'model':'supertonic-3','model_dir':'/voices','auto_download':False,'intra_op_num_threads':1,'inter_op_num_threads':1}]
+    assert client.get('/healthz').json=={'status':'ok','voice':'M1','model':'supertonic-3','language':'sk'}
 
 
-@pytest.mark.parametrize('payload',[['bad-root'],'bad-root',123,{'text':'x'*1801},{'text':'   '},{'text':'Allowed text','voice':'other-voice'}])
+@pytest.mark.parametrize('payload',[['bad-root'],'bad-root',123,{'text':'x'*601},{'text':'   '},{'text':'Allowed text','voice':'other-voice'}])
 def test_private_speech_rejects_invalid_input_without_synthesis(private_speech_server,payload):
     client,options,spoken=private_speech_server
     assert client.post('/synthesize',json=payload).status_code==400
@@ -444,3 +437,12 @@ def test_admin_episode_retry_resets_exhausted_counter_and_retains_transcript(aud
     assert row['transcript']=='Preserved original transcript'
     assert client.post('/admin/action',data={'action':'retry','target_type':'episode','target':ready,'csrf':csrf}).status_code==303
     assert episode(ready)['status']=='ready' and episode(ready)['attempts']==2
+
+@pytest.mark.parametrize('samples',[[],[float('nan')],[float('inf')]])
+def test_private_speech_rejects_empty_or_nonfinite_model_output(private_speech_server,monkeypatch,samples):
+    import numpy as np
+    client,_,_=private_speech_server
+    # The route globals belong to the isolated module loaded by the fixture.
+    engine=client.application.view_functions['synthesize'].__globals__['engine']
+    monkeypatch.setattr(engine,'synthesize',lambda *args,**kwargs:(np.array(samples),np.array([0])))
+    assert client.post('/synthesize',json={'text':'Dobrá správa.','voice':'M1'}).status_code==502

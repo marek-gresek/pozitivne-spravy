@@ -10,6 +10,10 @@ Slovenský čitateľský web, ktorý zbiera správy z RSS, pripravuje krátke sl
 
 ![Pozitívne správy V2 – široký prehľad, sentimentové štatistiky a podcastové kapitoly](docs/screenshots/desktop.jpg)
 
+### Časová os tém podcastu
+
+![Klikateľné úseky kapitol so zvýraznením aktuálnej témy](docs/screenshots/podcast-timeline.jpg)
+
 ### Kompaktné čítanie a uloženie na neskôr
 
 ![Kompaktné karty, záložky pri článkoch a ovládanie čítania](docs/screenshots/reader-tools.jpg)
@@ -29,9 +33,10 @@ Screenshoty zachytávajú verejné rozhranie; počty správ sa priebežne menia.
 - Označí články pridané od poslednej návštevy a umožní označiť novinky ako prečítané. Rozhoduje čas pridania, takže zachytí aj oneskorene spracované články.
 - Ikonou záložky uložíte najviac 300 článkov do sekcie **Uložené**. Zoznam aj kompaktné zobrazenie zostávajú v danom prehliadači, bez účtu a synchronizácie medzi zariadeniami. Vymazanie miestneho úložiska odstráni tieto nastavenia.
 - Lokálne zoskupí veľmi podobné články o jednej udalosti do rozbaliteľnej karty. Zachová všetky články, ich vlastné súhrny a zdroje. Zoskupenie možno vypnúť vo filtroch; štatistiky vždy počítajú články.
-- Zobrazuje dva denné podcasty: pozitívny výber a všeobecný prehľad. Scenáre vznikajú cez OpenAI API; hlas vytvára lokálny **Piper**.
+- Zobrazuje dva denné podcasty: pozitívny výber a všeobecný prehľad. Scenáre vznikajú cez OpenAI API; hlas vytvára lokálny **Supertonic 3 M1**.
 - Prehrávač podporuje kapitoly, preskakovanie, posúvanie, rýchlosť a pokračovanie pri navigácii. Po úplnom obnovení stránky sa obnoví pozícia bez automatického prehrávania.
-- Audio je skutočné MP3, mono, 64 kb/s. Po **14 dňoch** sa odstráni; prepis, kapitoly a zdrojové odkazy zostávajú.
+- Prehrávač zobrazuje časovú os rozdelenú podľa skutočných dĺžok tém; kliknutie na úsek preskočí na jeho začiatok.
+- Audio je skutočné MP3, mono, 44,1 kHz, 64 kb/s. Po **14 dňoch** sa odstráni; prepis, kapitoly a zdrojové odkazy zostávajú.
 - Má responzívny vzhľad, svetlú a tmavú tému a súkromnú administráciu so stavom fronty, zdrojov, tokenov a úložiska.
 
 Automatická analýza sa môže pomýliť. Sentiment opisuje udalosť, nie kvalitu média. Úplný kontext treba hľadať v pôvodnom článku.
@@ -47,10 +52,10 @@ RSS → kontrola duplicít → extrakcia článku → trvalá fronta
                                       ↙           ↘
                                Flask web      podcastový scenár
                                                     ↓
-                                              Piper → MP3
+                                              Supertonic 3 M1 → MP3
 ```
 
-Docker Compose spúšťa **web, jedného pracovníka a interný Piper**. SQLite s WAL je jediný zdroj pravdy. Verejné čítanie, filtre, kapitoly a vyhľadávanie nevyvolávajú AI požiadavky. Webová služba nemá pripojený API kľúč.
+Docker Compose spúšťa **web, jedného pracovníka a interný hlasový server Supertonic**. SQLite s WAL je jediný zdroj pravdy. Verejné čítanie, filtre, kapitoly a vyhľadávanie nevyvolávajú AI požiadavky. Webová služba nemá pripojený API kľúč.
 
 Čitateľské funkcie tiež nevolajú AI. Zoskupovanie konzervatívne porovnáva titulky, sentiment, tému, miesto, čísla, entity a čas publikovania; neprepisuje databázu. Rôzne sentimenty zostávajú oddelené. Podobnosť nemusí zachytiť všetky súvisiace články a môže sa pomýliť, preto sú pôvodné zdroje aj samostatné detaily vždy dostupné. Pri zozname **Uložené** prehliadač pošle iba vybrané verejné identifikátory v hlavičke požiadavky; odpoveď sa verejne neukladá do cache a server nevytvára profil čitateľa. Na uložené články a pamätanie návštevy je potrebný JavaScript a miestne úložisko.
 
@@ -60,7 +65,7 @@ Textová pipeline používa `gpt-6-luna` na bežnú analýzu a `gpt-6.1-sol` na 
 
 ## Spustenie
 
-Potrebujete Docker s Compose, OpenAI API kľúč s prístupom k nakonfigurovaným modelom a dostatok miesta na hlasový model a pracovné audio. Pri prvom zostavení sa stiahne slovenský hlas `sk_SK-lili-medium`.
+Potrebujete Docker s Compose, OpenAI API kľúč s prístupom k nakonfigurovaným modelom a dostatok miesta na hlasový model a pracovné audio. Pri prvom zostavení sa stiahne model Supertonic 3 s mužským hlasom `M1` (približne 400 MB).
 
 ```sh
 git clone https://github.com/marek-gresek/pozitivne-spravy.git
@@ -89,7 +94,7 @@ Web bude dostupný na **http://127.0.0.1:5001**. Predvolená adresa OpenAI Respo
 
 `/admin` vyžaduje Cloudflare Access. V `.env` nastavte vlastné `CF_ACCESS_TEAM`, `CF_ACCESS_AUD` a `SECRET_KEY`. Server overuje podpis RS256, vydavateľa, publikum, platnosť a subjekt JWT; samotná emailová hlavička nestačí. Bez konfigurácie je administrácia uzavretá. Zmeny fronty vyžadujú CSRF token.
 
-Ak web zverejňujete, použite HTTPS a nakonfigurujte ochranu administrácie. Verejný reverzný proxy pripájajte k lokálnemu portu; interný Piper nevystavujte na internet.
+Ak web zverejňujete, použite HTTPS a nakonfigurujte ochranu administrácie. Verejný reverzný proxy pripájajte k lokálnemu portu; interný hlasový server Supertonic nevystavujte na internet.
 
 ### Plánovanie a retencia
 
@@ -135,7 +140,7 @@ V2 je nová implementácia webu aj spracovania. `migrate.py` pridáva databázov
 
 - Kvalita extrakcie závisí od dostupnosti zdroja; pri použití iba RSS výňatku je článok označený.
 - AI hodnotenie a súhrny potrebujú redakčnú kontrolu. Projekt nie je nezávislé overovanie pravdivosti správ.
-- Lokálny hlas Piper môže znieť synteticky. V2 nesľubuje kvalitu ľudského moderátora.
+- Lokálny hlas Supertonic 3 M1 môže znieť synteticky. V2 nesľubuje kvalitu ľudského moderátora.
 - Docker pamäťové limity závisia od podpory hostiteľa. Procesový limit virtuálnej pamäte nenahrádza súhrnný limit RAM kontajnera.
 - Zdrojový kód neobsahuje živú databázu, článkový archív, audio, súkromnú konfiguráciu ani API kľúče.
 
@@ -143,4 +148,10 @@ V2 je nová implementácia webu aj spracovania. `migrate.py` pridáva databázov
 
 Nápady a opravy sú vítané cez issues a pull requesty. Pred odoslaním spustite testy a kontrolu tajomstiev podľa [SECURITY.md](SECURITY.md). Bezpečnostný problém s reálnym kľúčom neoznamujte verejným issue.
 
-Kód projektu: **[MIT](LICENSE)**, Marek Grešek. Lokálne fonty Inter a Newsreader majú vlastné SIL Open Font License v `static/fonts/`. Hlasový model Piper má samostatné podmienky uvedené v [modelovej karte Lili](https://huggingface.co/rhasspy/piper-voices/blob/main/sk/sk_SK/lili/medium/MODEL_CARD); nespadá pod MIT licenciu tohto repozitára. Pôvodné články zostávajú obsahom príslušných vydavateľov.
+Kód projektu: **[MIT](LICENSE)**, Marek Grešek. Lokálne fonty Inter a Newsreader majú vlastné SIL Open Font License v `static/fonts/`. Hlasový model Supertonic 3 má samostatnú [licenciu OpenRAIL-M](https://huggingface.co/supertone-oss-archive/supertonic-3/blob/aafc6e32416a594460b32413efc49d7fe4ce6d46/LICENSE); nespadá pod MIT licenciu tohto repozitára. Pôvodné články zostávajú obsahom príslušných vydavateľov.
+
+### Lokálne nahovorenie
+
+Používa sa SDK `supertonic==1.3.1`, hlas `M1`, slovenčina (`sk`), 16 krokov a rýchlosť 1.0. Docker pri zostavení stiahne presnú revíziu modelu `aafc6e32416a594460b32413efc49d7fe4ce6d46` z oficiálneho archívu `supertone-oss-archive/supertonic-3`. Za behu sa modely nesťahujú a nahovorenie nevolá cloud. Server povoľuje iba tento hlas a najviac 600 znakov na požiadavku, jeden proces a jedno vlákno výpočtu (samostatné HTTP vlákno umožňuje kontrolu zdravia počas nahovorenia). Na slabšom CPU môže nahovorenie trvať dlhšie než samotná epizóda; pracovník čaká na hotové audio pred publikovaním. Existujúce vydania sa automaticky nenahrávajú znova.
+
+Pri aktualizácii z Piperu najprv zostavte a overte novú službu `tts`, nechajte dobehnúť rozpracovanú epizódu a potom aktualizujte pracovníka. Pôvodnú službu `piper` odstráňte až po úspešnej kontrole novej služby. DB, audio a 14-dňová retencia zostávajú zachované.

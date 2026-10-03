@@ -11,7 +11,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 import requests
 from ai_client import ResponsesClient,AIError,json_result
-from config import EDITOR_MODEL,PIPER_URL,AUDIO_DIR,TEMP_AUDIO_DIR,AUDIO_RETENTION_DAYS
+from config import EDITOR_MODEL,TTS_URL,TTS_VOICE,TTS_MAX_CHARS,AUDIO_DIR,TEMP_AUDIO_DIR,AUDIO_RETENTION_DAYS
 from database import connect,utcnow,setting,set_setting
 
 UTC=timezone.utc
@@ -78,7 +78,7 @@ def claim_episode(allowed_days=None):
             clause=' AND day IN ('+','.join('?' for _ in allowed_days)+')';args.extend(sorted(allowed_days))
         r=c.execute("SELECT * FROM episodes WHERE status IN ('pending','script') AND attempts<3 AND (available_at IS NULL OR available_at<=?)"+clause+" ORDER BY created_at LIMIT 1",args).fetchone()
         if not r:return None
-        lease=(datetime.now(UTC)+timedelta(minutes=40)).isoformat(timespec='seconds')
+        lease=(datetime.now(UTC)+timedelta(minutes=90)).isoformat(timespec='seconds')
         c.execute("UPDATE episodes SET status='generating',lease_until=?,attempts=attempts+1 WHERE id=?",(lease,r['id']))
         return dict(r)
 
@@ -107,19 +107,19 @@ def generate_episode(episode,client=None):
             # Short independent requests bound memory and allow natural chapter timing.
             segments=[];current=''
             for sentence in re.split(r'(?<=[.!?])\s+',ch['text']):
-                while len(sentence)>1800:
+                while len(sentence)>TTS_MAX_CHARS:
                     if current.strip():segments.append(current.strip());current=''
-                    cut=sentence.rfind(' ',0,1801)
-                    if cut<1:cut=1800
+                    cut=sentence.rfind(' ',0,TTS_MAX_CHARS+1)
+                    if cut<1:cut=TTS_MAX_CHARS
                     segments.append(sentence[:cut].strip());sentence=sentence[cut:].lstrip()
-                if current and len(current)+len(sentence)+1>1800:segments.append(current.strip());current=''
+                if current and len(current)+len(sentence)+1>TTS_MAX_CHARS:segments.append(current.strip());current=''
                 current+=sentence+' '
             if current.strip():segments.append(current)
             for j,text in enumerate(segments):
                 wav=tmp/f'{eid}-{attempt}-{i}-{j}.wav';mp3=tmp/f'{eid}-{attempt}-{i}-{j}.mp3';files.extend([wav,mp3])
-                r=requests.post(PIPER_URL.rstrip('/')+'/synthesize',json={'text':text.strip(),'voice':'sk_SK-lili-medium'},timeout=(10,180));r.raise_for_status()
+                r=requests.post(TTS_URL.rstrip('/')+'/synthesize',json={'text':text.strip(),'voice':TTS_VOICE},timeout=(10,360));r.raise_for_status()
                 wav.write_bytes(r.content)
-                subprocess.run(['ffmpeg','-nostdin','-v','error','-y','-i',str(wav),'-ac','1','-ar','22050','-b:a','64k',str(mp3)],check=True,capture_output=True)
+                subprocess.run(['ffmpeg','-nostdin','-v','error','-y','-i',str(wav),'-ac','1','-ar','44100','-b:a','64k',str(mp3)],check=True,capture_output=True)
                 offset+=audio_duration(mp3);parts.append(mp3)
         manifest=tmp/f'{eid}-{attempt}.txt';files.append(manifest)
         manifest.write_text('\n'.join("file '"+str(p.resolve())+"'" for p in parts))

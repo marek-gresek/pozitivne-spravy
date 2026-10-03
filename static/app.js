@@ -14,6 +14,9 @@
   const chapterSelect = document.getElementById('player-chapter');
   const previousChapter = document.getElementById('player-previous-chapter');
   const nextChapter = document.getElementById('player-next-chapter');
+  const segments = document.getElementById('player-segments');
+  const topicLabel = document.getElementById('player-topic-label');
+  let chapterDuration = 0;
   let chapters = [];
   let chapterController = null;
   const key = 'pozitivne-spravy-player-v1';
@@ -44,6 +47,12 @@
     if (!chapters.length) return;
     const index = chapterIndex();
     chapterSelect.value = String(index);
+    if (segments) Array.from(segments.children).forEach((button,i) => {
+      button.dataset.active = String(i === index);
+      if (i === index) button.setAttribute('aria-current', 'true');
+      else button.removeAttribute('aria-current');
+    });
+    if (topicLabel) { topicLabel.textContent = chapters[index].title; topicLabel.hidden = false; }
     previousChapter.disabled = index === 0 && audio.currentTime <= chapters[0].start + 3;
     nextChapter.disabled = index === chapters.length - 1;
     previousChapter.title = index > 0 && audio.currentTime <= chapters[index].start + 3
@@ -52,24 +61,58 @@
     nextChapter.title = index < chapters.length - 1 ? 'Ďalšia kapitola: ' + chapters[index + 1].title : 'Posledná kapitola';
     nextChapter.setAttribute('aria-label', nextChapter.title);
   }
+  function clearTimeline() {
+    chapterDuration = 0;
+    if (segments) { segments.replaceChildren(); segments.hidden = true; }
+    if (topicLabel) { topicLabel.textContent = ''; topicLabel.hidden = true; }
+  }
+  function renderTimeline() {
+    if (!segments) return;
+    const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : chapterDuration;
+    segments.replaceChildren(); segments.hidden = true;
+    if (!chapters.length || !duration) return;
+    // Ignore malformed/out-of-range starts; preserve proportional widths, including short topics.
+    chapters = chapters.filter(ch => ch.start < duration);
+    chapterSelect.replaceChildren();
+    chapters.forEach((chapter,index) => {
+      const option = document.createElement('option'); option.value = String(index);
+      option.textContent = clock(chapter.start) + ' · ' + chapter.title;
+      chapterSelect.append(option);
+      const end = index + 1 < chapters.length ? chapters[index + 1].start : duration;
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'player-segment';
+      button.style.flexBasis = String((end - chapter.start) / duration * 100) + '%';
+      button.style.flexGrow = '0'; button.style.flexShrink = '0';
+      button.title = clock(chapter.start) + ' · ' + chapter.title;
+      button.setAttribute('aria-label', 'Prejsť na tému: ' + button.title);
+      const label = document.createElement('span'); label.className = 'player-segment-label';
+      label.textContent = chapter.title; button.append(label);
+      button.addEventListener('click', () => { seek(chapter.start); update(); persist(); });
+      segments.append(button);
+    });
+    segments.hidden = !chapters.length; chapterPanel.hidden = !chapters.length;
+    updateChapters();
+  }
   async function loadChapters(episode) {
     if (chapterController) chapterController.abort();
     const controller = new AbortController(); chapterController = controller;
-    chapters = []; chapterSelect.replaceChildren(); chapterPanel.hidden = true;
+    chapters = []; clearTimeline(); chapterSelect.replaceChildren(); chapterPanel.hidden = true;
     previousChapter.disabled = true; nextChapter.disabled = true;
     try {
       const response = await fetch(episode.href + '/kapitoly.json', {signal: controller.signal, credentials: 'same-origin'});
       if (!response.ok) return;
       const data = await response.json();
       if (controller !== chapterController || !data.available || !Array.isArray(data.chapters)) return;
+      chapterDuration = Number.isFinite(data.duration) && data.duration > 0 ? data.duration : 0;
       chapters = data.chapters.filter(ch => ch && typeof ch.title === 'string' && Number.isFinite(ch.start) && ch.start >= 0)
-        .sort((a,b) => a.start - b.start);
+        .sort((a,b) => a.start - b.start)
+        .filter((chapter,index,list) => !index || chapter.start > list[index - 1].start);
       chapters.forEach((chapter,index) => {
         const option = document.createElement('option'); option.value = String(index);
         option.textContent = clock(chapter.start) + ' · ' + chapter.title;
         chapterSelect.append(option);
       });
-      chapterPanel.hidden = !chapters.length; updateChapters();
+      chapterPanel.hidden = !chapters.length; renderTimeline(); updateChapters();
     } catch (_) { /* Audio and the episode transcript remain usable if metadata cannot load. */ }
   }
   chapterSelect.addEventListener('change', () => {
@@ -109,7 +152,8 @@
     show(); play(); persist();
   });
   toggle.addEventListener('click', () => { if (audio.paused) play(); else audio.pause(); });
-  audio.addEventListener('loadedmetadata', () => { if (desiredPosition) seek(desiredPosition); update(); });
+  audio.addEventListener('loadedmetadata', () => { if (desiredPosition) seek(desiredPosition); renderTimeline(); update(); });
+  audio.addEventListener('durationchange', renderTimeline);
   function syncPlaybackControl() {
     const playing = !audio.paused && !audio.ended;
     const label = playing ? 'Pozastaviť podcast' : 'Prehrať podcast';
@@ -131,7 +175,7 @@
   audio.addEventListener('timeupdate', () => { update(); if (Date.now() - lastSaved > 2000) { persist(); lastSaved = Date.now(); } });
   progress.addEventListener('input', () => { if (Number.isFinite(audio.duration)) { seek(Number(progress.value) / 100 * audio.duration); update(); persist(); } });
   speed.addEventListener('change', () => { applySpeed(); persist(); });
-  document.getElementById('player-close').addEventListener('click', () => { audio.pause(); current = null; if (chapterController) chapterController.abort(); chapters = []; chapterPanel.hidden = true; audio.removeAttribute('src'); audio.load(); player.hidden = true; document.body.classList.remove('player-open'); try { localStorage.removeItem(key); } catch (_) {} });
+  document.getElementById('player-close').addEventListener('click', () => { audio.pause(); current = null; if (chapterController) chapterController.abort(); chapters = []; clearTimeline(); chapterPanel.hidden = true; audio.removeAttribute('src'); audio.load(); player.hidden = true; document.body.classList.remove('player-open'); try { localStorage.removeItem(key); } catch (_) {} });
   window.addEventListener('pagehide', persist);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persist(); });
   try {

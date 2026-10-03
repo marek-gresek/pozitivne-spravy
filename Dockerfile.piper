@@ -1,7 +1,0 @@
-FROM python:3.11-slim
-WORKDIR /tts
-RUN pip install --no-cache-dir 'piper-tts[http]==1.8.0'
-RUN python -m piper.download_voices --data-dir /voices sk_SK-lili-medium
-ENV OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
-COPY piper_server.py bounded_service.py ./
-CMD ["python","bounded_service.py","python","piper_server.py"]

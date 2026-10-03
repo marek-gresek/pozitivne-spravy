@@ -237,7 +237,7 @@ def test_chapter_metadata_reads_do_not_generate_audio_and_survive_expiry(web):
     chapters=[{'title':'Úvod < bezpečný','start':0,'text':'Nezverejňovať celé audio cez metadata'}, {'title':'Veda','start':19.2}]
     eid=insert_episode(chapters=json.dumps(chapters,ensure_ascii=False))
     response=client.get('/podcasty/'+eid+'/kapitoly.json')
-    assert response.status_code==200 and response.json=={'available':True,'chapters':[{'title':'Úvod < bezpečný','start':0},{'title':'Veda','start':19.2}]}
+    assert response.status_code==200 and response.json=={'available':True,'duration':None,'chapters':[{'title':'Úvod < bezpečný','start':0},{'title':'Veda','start':19.2}]}
     with database.connect() as c:
         assert c.execute('SELECT count(*) FROM ai_usage').fetchone()[0]==0
         c.execute("UPDATE episodes SET status='expired' WHERE id=?",(eid,))

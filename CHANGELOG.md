@@ -1,5 +1,11 @@
 # Zmeny
 
+## Zlepšenia po V2.0.0 · 2026-10-03
+
+- Mužský lokálny hlas Supertonic 3 M1 nahrádza Piper pre nové vydania. Model aj hlas zodpovedajú vybranej ukážke; existujúce epizódy sa nenahrávajú znova.
+- Prehrávač zobrazuje klikateľné úseky tém podľa skutočných dĺžok a zvýrazňuje aktuálnu kapitolu.
+- Hlasový server ostáva dostupný pre kontrolu zdravia počas nahovorenia; krátke požiadavky a dlhšia pracovná lehota zohľadňujú rýchlosť CPU.
+
 ## V2.0.0 · 2026-10-03
 
 - Kompletný redizajn verejného webu a administrácie, široké rozloženie na počítači, mobilné ovládanie a svetlá/tmavá téma.

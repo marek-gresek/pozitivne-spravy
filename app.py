@@ -134,7 +134,7 @@ def create_app():
         if not row: abort(404)
         ep=episode_view(row)
         # Textual chapter metadata survives audio expiry; no synthesis on reads.
-        return {'available':ep['available'],'chapters':[{'title':ch.get('title',''),'start':ch.get('start',0)} for ch in ep['chapters'] if isinstance(ch,dict)]}
+        return {'available':ep['available'],'duration':ep['duration'],'chapters':[{'title':ch.get('title',''),'start':ch.get('start',0)} for ch in ep['chapters'] if isinstance(ch,dict)]}
 
     @app.get('/podcasty')
     def podcasts():

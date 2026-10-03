@@ -28,7 +28,7 @@ services:
     environment:
       DB_FILE: /data/clanky.db
       AUDIO_DIR: /data/audio
-      PIPER_URL: http://piper:5000
+      TTS_URL: http://tts:5000
       AI_KEY_FILE: /run/secrets/ai_key
       TZ: Europe/Prague
       MEMORY_CEILING_MB: 1536
@@ -39,18 +39,24 @@ services:
     depends_on:
       app:
         condition: service_healthy
-      piper:
-        condition: service_started
+      tts:
+        condition: service_healthy
     mem_limit: 1g
     cpus: 1
-  piper:
+  tts:
     build:
       context: .
-      dockerfile: Dockerfile.piper
-    image: pozitivne-spravy-piper:2
+      dockerfile: Dockerfile.tts
+    image: pozitivne-spravy-tts:2
     restart: unless-stopped
     expose: ["5000"]
     environment:
       MEMORY_CEILING_MB: 2048
     mem_limit: 1g
     cpus: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
