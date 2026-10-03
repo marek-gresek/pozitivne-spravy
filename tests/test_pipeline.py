@@ -174,17 +174,14 @@ def test_transient_failure_stops_after_third_attempt(db):
     assert task('a')['state']=='failed'
 
 
-def test_long_text_all_chunks_are_seen_and_original_is_stored(db, monkeypatch):
+def test_long_text_selected_locally_and_original_stored(db, monkeypatch):
     source='A'*30000+'TAIL_UNIQUE_SENTINEL'; value=item(text=source);enqueue(value)
     monkeypatch.setattr(pipeline,'extract_article',lambda value:value)
-    class LongClient(Client):
-        def generate(self,model,instructions,prompt,**kwargs):
-            if kwargs.get('task')=='long_article':
-                self.calls.append((model,prompt,kwargs));return 'Facts '+prompt[-40:]
-            return super().generate(model,instructions,prompt,**kwargs)
-    client=LongClient(); assert pipeline.process_queue(client,max_batches=1)==1
-    chunks=[p for _,p,k in client.calls if k.get('task')=='long_article']
-    assert len(chunks)==2 and 'TAIL_UNIQUE_SENTINEL' in chunks[-1]
+    client=Client(); assert pipeline.process_queue(client,max_batches=1)==1
+    assert len(client.calls)==1
+    inp=json.loads(client.calls[0][1])[0]
+    assert 'TAIL_UNIQUE_SENTINEL' in inp['text'] and inp['selected_excerpt'] is True
+    assert len(inp['text'].encode())<=config.ARTICLE_TEXT_BYTES
     with database.connect() as c: assert c.execute('SELECT full_text FROM clanky').fetchone()[0]==source
 
 
@@ -319,3 +316,55 @@ def test_entity_case_matching_preserves_canonical_identity():
     assert pipeline.grounded_entities(['Roberta Smith'],'Robert Smith signed the paper.')==[]
     assert pipeline.grounded_entities(['Robert Fico'],'Hovorili s Robertom Ficom.')==['Robert Fico']
     assert pipeline.grounded_entities(['Vrútky'],'Koncert vo Vrútkach sa skončil.')==['Vrútky']
+
+
+def test_sixteen_small_articles_use_one_bounded_call(db,monkeypatch):
+    for n in range(16):enqueue(item(str(n)))
+    monkeypatch.setattr(pipeline,'extract_article',lambda value:value)
+    client=Client();assert pipeline.process_queue(client,max_batches=1)==16
+    assert len(client.calls)==1 and len(json.loads(client.calls[0][1]))==16
+    assert len(client.calls[0][1].encode())+len(pipeline.INSTRUCTIONS.encode())+2000<=config.ARTICLE_INPUT_BYTES
+
+
+def test_input_groups_bound_serialized_unicode_and_keep_original():
+    values=[item(str(n),('Žltý text „\\"quoted\\"“ s dátumom 2026 a menom Anna. '*100)+str(n)) for n in range(16)]
+    groups=list(pipeline.input_groups(values))
+    assert sum(len(group) for group in groups)==16
+    for group in groups:
+        weight=len(json.dumps(pipeline.input_payload([inp for _,inp in group]),ensure_ascii=False,separators=(',',':')).encode())+len(pipeline.INSTRUCTIONS.encode())+2000
+        assert weight<=config.ARTICLE_INPUT_BYTES
+        for original,inp in group:assert len(inp['text'].encode())<=config.ARTICLE_TEXT_BYTES and original in values
+
+
+def test_cleaning_removes_only_boilerplate_and_exact_duplicate_paragraphs():
+    fact='Anna oznámila investíciu 20 miliónov eur. Výsledky však zatiaľ nie sú potvrdené.'
+    source='Read more\n'+fact+'\n'+fact+'\nSubscribe to our newsletter today.\nVýskum súvisiacich článkov pokračuje.'
+    clean=pipeline.clean_source(source)
+    assert clean.count(fact)==1 and 'Výskum súvisiacich článkov pokračuje.' in clean
+    assert 'newsletter' not in clean and 'Read more' not in clean
+
+
+def test_long_selection_covers_middle_end_and_preserves_qualifiers():
+    paragraphs=['Vedci Anna a Peter oznámili výsledok. Zatiaľ však nie je potvrdený.']
+    paragraphs += [('Sekcia %d opisuje údaje. Dňa 12. marca merali %d vzoriek, ale výsledok je predbežný. '%(n,n))*10 for n in range(30)]
+    paragraphs += ['Na záver: konečný počet je 98765 a pokus ešte neskončil.']
+    inp=pipeline.prepare_input(item(text='\n\n'.join(paragraphs)))
+    assert inp['selected_excerpt'] and len(inp['text'].encode())<=config.ARTICLE_TEXT_BYTES
+    assert '98765' in inp['text'] and 'Zatiaľ však nie je potvrdený' in inp['text']
+    assert any('Sekcia '+str(n) in inp['text'] for n in range(12,20))
+
+
+@pytest.mark.parametrize('luna_repair_valid',[True,False])
+def test_only_failed_item_repaired_with_luna_before_sol(db,monkeypatch,luna_repair_valid):
+    for ident in ('a','b'):enqueue(item(ident))
+    monkeypatch.setattr(pipeline,'extract_article',lambda value:value)
+    calls=[]
+    def response(model,prompt):
+        ids=[v['id'] for v in json.loads(prompt)];calls.append((model,ids))
+        if len(calls)==1:return json.dumps([result('a')])
+        if model==config.ARTICLE_MODEL and not luna_repair_valid:return 'invalid JSON'
+        return json.dumps([result('b')])
+    client=Client(response);assert pipeline.process_queue(client,max_batches=1)==2
+    assert calls[:2]==[(config.ARTICLE_MODEL,['a','b']),(config.ARTICLE_MODEL,['b'])]
+    assert calls[2:]==([] if luna_repair_valid else [(config.EDITOR_MODEL,['b'])])
+    assert all(kwargs['task']=='article_repair' for _,_,kwargs in client.calls[1:])

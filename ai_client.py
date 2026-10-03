@@ -4,7 +4,7 @@ import time
 import uuid
 from pathlib import Path
 import requests
-from config import AI_ENDPOINT, ALLOWED_MODELS, KEY_FILE, USER_AGENT
+from config import AI_ENDPOINT, ALLOWED_MODELS, KEY_FILE, USER_AGENT, AI_TEXT_PROFILE
 from database import connect, utcnow
 
 class AIError(Exception):
@@ -23,7 +23,7 @@ class ResponsesClient:
             with self.session.post(AI_ENDPOINT,headers={'Authorization':'Bearer '+key,
                 'User-Agent':USER_AGENT,'Content-Type':'application/json'},json={'model':model,
                 'stream':True,'reasoning':{'effort':'high'},'instructions':instructions,'input':prompt,
-                'tools':[]},stream=True,timeout=(20,300)) as response:
+                'tools':[],**({'metadata':{'text_profile':AI_TEXT_PROFILE}} if AI_TEXT_PROFILE else {})},stream=True,timeout=(20,300)) as response:
                 request_id=response.headers.get('x-request-id')
                 if response.status_code>=400:
                     # Public bot rejection, auth and contract errors are not quota exhaustion.

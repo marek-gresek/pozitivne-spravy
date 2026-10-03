@@ -182,7 +182,7 @@ def speech_setup(monkeypatch,chapters=None):
     class Client:
         def generate(self,model,instructions,prompt,**kwargs):
             assert model=='gpt-6.1-sol' and kwargs['task']=='podcast'
-            return json.dumps({'chapters':chapters or [{'title':'Prvá správa','text':'Vedci oznámili výsledok.','article_ids':['article']},{'title':'Záver','text':'Ďakujeme za počúvanie.','article_ids':[]}]})
+            return json.dumps({'scripts':{kind:{'chapters':chapters or [{'title':'Prvá správa','text':'Vedci oznámili výsledok.','article_ids':['article']},{'title':'Záver','text':'Ďakujeme za počúvanie.','article_ids':[]}]} for kind in json.loads(prompt)['selections']}})
     return Client(),calls
 
 
@@ -446,3 +446,73 @@ def test_private_speech_rejects_empty_or_nonfinite_model_output(private_speech_s
     engine=client.application.view_functions['synthesize'].__globals__['engine']
     monkeypatch.setattr(engine,'synthesize',lambda *args,**kwargs:(np.array(samples),np.array([0])))
     assert client.post('/synthesize',json={'text':'Dobrá správa.','voice':'M1'}).status_code==502
+
+
+def paired_scripts(audio_db,monkeypatch,partial=False):
+    root,_=audio_db;day='2026-10-02'
+    positive,_=add_episode(root,status='pending',day=day,transcript=None,chapters='[]')
+    general,_=add_episode(root,status='pending',kind='all',day=day,transcript=None,chapters='[]')
+    common={'id':'common','nadpis':'Common','zhrnutie':'Shared fact','topic':'Veda','kategoria':'Svet'}
+    other={**common,'id':'other','nadpis':'Other'}
+    monkeypatch.setattr(podcasts,'select_articles',lambda day,kind:[common] if kind=='positive' else [common,other])
+    class Client:
+        calls=[]
+        def generate(self,model,instructions,prompt,**kwargs):
+            data=json.loads(prompt);self.calls.append(data)
+            assert model==config.EDITOR_MODEL and kwargs['task']=='podcast'
+            scripts={kind:{'chapters':[{'title':kind,'text':'Overené fakty.','article_ids':ids}]} for kind,ids in data['selections'].items()}
+            if partial and len(self.calls)==1:scripts['positive']={'chapters':[]}
+            return json.dumps({'scripts':scripts})
+    return positive,general,Client()
+
+
+def test_two_scripts_one_call_shared_articles_once_and_saved_before_speech(audio_db,monkeypatch):
+    positive,general,client=paired_scripts(audio_db,monkeypatch)
+    chapters=podcasts.prepare_scripts(episode(positive),client)
+    assert chapters and len(client.calls)==1
+    assert {a['id'] for a in client.calls[0]['articles']}=={'common','other'}
+    assert len(client.calls[0]['articles'])==2
+    assert episode(positive)['transcript'] and episode(general)['transcript']
+    assert podcasts.saved_chapters(episode(general))
+    assert episode(general)['status']=='pending'  # scripts are not published audio
+
+
+def test_partial_pair_commits_valid_script_and_retries_only_invalid_after_restart(audio_db,monkeypatch):
+    from ai_client import AIError
+    positive,general,client=paired_scripts(audio_db,monkeypatch,partial=True)
+    with pytest.raises(AIError,match='invalid_script'):podcasts.prepare_scripts(episode(positive),client)
+    saved=episode(general)['transcript'];assert saved and not episode(positive)['transcript']
+    podcasts.prepare_scripts(episode(positive),client)
+    assert list(client.calls[1]['selections'])==['positive']
+    assert [a['id'] for a in client.calls[1]['articles']]==['common']
+    assert episode(general)['transcript']==saved
+
+
+def test_pair_does_not_bypass_partner_backoff_or_overwrite_published_episode(audio_db,monkeypatch):
+    positive,general,client=paired_scripts(audio_db,monkeypatch)
+    with database.connect() as c:c.execute('UPDATE episodes SET available_at=? WHERE id=?',((datetime.now(UTC)+timedelta(hours=1)).isoformat(),general))
+    podcasts.prepare_scripts(episode(positive),client)
+    assert list(client.calls[0]['selections'])==['positive'] and not episode(general)['transcript']
+
+
+@pytest.mark.parametrize('partial',[False,True])
+def test_worker_episode_loop_publishes_pair_once_and_resumes_partial_script(audio_db,monkeypatch,partial):
+    import shutil
+    if not shutil.which('ffmpeg'):pytest.skip('ffmpeg is required for the real publication seam')
+    positive,general,client=paired_scripts(audio_db,monkeypatch,partial=partial)
+    class Reply:
+        content=wav_bytes()
+        def raise_for_status(self):pass
+    monkeypatch.setattr(podcasts.requests,'post',lambda *args,**kwargs:Reply())
+    assert podcasts.process_episodes(client,allowed_days={'2026-10-02'})==(1 if partial else 2)
+    assert len(client.calls)==1 and episode(general)['status']=='ready'
+    published=episode(general)['published_at'];transcript=episode(general)['transcript']
+    if partial:
+        assert episode(positive)['status']=='pending'
+        with database.connect() as c:c.execute('UPDATE episodes SET available_at=? WHERE id=?',(database.utcnow(),positive))
+        assert podcasts.process_episodes(client,allowed_days={'2026-10-02'})==1
+        assert list(client.calls[1]['selections'])==['positive']
+    assert episode(positive)['status']=='ready' and episode(general)['published_at']==published
+    assert episode(general)['transcript']==transcript
+    assert podcasts.process_episodes(client,allowed_days={'2026-10-02'})==0
+    assert len(client.calls)==(2 if partial else 1)

@@ -106,3 +106,11 @@ def test_network_errors_are_sanitized(tmp_path):
 def test_completed_only_output_has_same_size_bound(tmp_path):
     obj,_=client(tmp_path,Response(sse(completed(output=[{'type':'message','content':[{'type':'output_text','text':'x'*256001}]}]))))
     with pytest.raises(ai_client.AIError,match='output_too_large'):obj.generate('gpt-6-luna','rules','source')
+
+
+def test_text_profile_opt_in_preserves_standard_api_default(tmp_path,monkeypatch):
+    monkeypatch.setattr(ai_client,'AI_TEXT_PROFILE','text-only')
+    obj,session=client(tmp_path,Response(sse(completed(output=[{'type':'message','content':[{'type':'output_text','text':'ok'}]}]))))
+    assert obj.generate('gpt-6-luna','rules','source')=='ok'
+    assert session.calls[0][1]['json']['metadata']=={'text_profile':'text-only'}
+    assert session.calls[0][1]['json']['reasoning']=={'effort':'high'}

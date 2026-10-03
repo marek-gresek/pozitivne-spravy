@@ -209,7 +209,7 @@ def create_app():
             tasks=[dict(r) for r in c.execute('SELECT id,kind,state,attempts,error,updated_at FROM tasks ORDER BY updated_at DESC LIMIT 100')]
             counts={r['state']:r['n'] for r in c.execute('SELECT state,count(*) n FROM tasks GROUP BY state')}
             usage=[dict(r) for r in c.execute('SELECT * FROM ai_usage ORDER BY id DESC LIMIT 100')]
-            usage_totals=dict(c.execute("SELECT count(*) calls,count(total_tokens) measured_calls,sum(input_tokens) input_tokens,sum(output_tokens) output_tokens,sum(reasoning_tokens) reasoning_tokens,sum(cached_tokens) cached_tokens,sum(total_tokens) total_tokens FROM ai_usage WHERE task IN ('article','long_article')").fetchone())
+            usage_totals=dict(c.execute("SELECT count(*) calls,count(total_tokens) measured_calls,sum(input_tokens) input_tokens,sum(output_tokens) output_tokens,sum(reasoning_tokens) reasoning_tokens,sum(cached_tokens) cached_tokens,sum(total_tokens) total_tokens FROM ai_usage WHERE task IN ('article','long_article','article_repair')").fetchone())
             usage_totals['articles']=c.execute("SELECT count(*) FROM clanky WHERE analysis_version=?",(config.ANALYSIS_VERSION,)).fetchone()[0]
             usage_totals['tokens_per_article']=(round(usage_totals['total_tokens']/usage_totals['articles']) if usage_totals['articles'] and usage_totals['total_tokens'] is not None else None)
             episodes=[episode_view(r) for r in c.execute('SELECT * FROM episodes ORDER BY day DESC LIMIT 30')]

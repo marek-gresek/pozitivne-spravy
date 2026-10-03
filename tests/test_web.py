@@ -244,3 +244,20 @@ def test_chapter_metadata_reads_do_not_generate_audio_and_survive_expiry(web):
     assert client.get('/podcasty/'+eid+'/kapitoly.json').json['available'] is False
     assert len(client.get('/podcasty/'+eid+'/kapitoly.json').json['chapters'])==2
     assert client.get('/podcasty/missing/kapitoly.json').status_code==404
+
+
+def test_admin_counts_luna_repairs_in_article_usage(web,monkeypatch):
+    client,_=web
+    _,_,token=access_token(monkeypatch)
+    with database.connect() as c:
+        c.execute('INSERT INTO ai_usage(model,task,status,total_tokens,created_at) VALUES(?,?,?,?,?)',('gpt-6-luna','article_repair','success',123456,database.utcnow()))
+    from flask import template_rendered
+    def capture(sender,template,context: dict,**extra):captured.update(context)
+    captured={}
+    with template_rendered.connected_to(capture,client.application):
+        page=client.get('/admin',headers={'Cf-Access-Jwt-Assertion':token})
+    assert captured['usage_totals']['total_tokens']==123456 and captured['usage_totals']['calls']==1
+    assert page.status_code==200 and 'Oprava článku'.encode() in page.data
+    assert '123'.encode() in page.data and '456'.encode() in page.data
+    # The row's label must not incorrectly classify repairs outside article totals.
+    assert 'Oprava článku<small>Mimo súhrnu článkov'.encode() not in page.data

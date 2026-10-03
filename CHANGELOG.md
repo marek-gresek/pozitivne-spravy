@@ -1,5 +1,12 @@
 # Zmeny
 
+## Úsporné spracovanie · 2026-10-03
+
+- Dávky najviac po 16 článkoch, lokálne čistenie podkladov a výber odsekov z dlhých textov; pôvodný archív ostáva zachovaný.
+- Opravy iba chybných položiek najprv Lunou a potom Solom; opravy sú zahrnuté do spotreby na článok.
+- Spoločné volanie pre oba denné scenáre s jednorazovým vstupom súhrnov a samostatným uložením každého platného scenára.
+
+
 ## Zlepšenia po V2.0.0 · 2026-10-03
 
 - Mužský lokálny hlas Supertonic 3 M1 nahrádza Piper pre nové vydania. Model aj hlas zodpovedajú vybranej ukážke; existujúce epizódy sa nenahrávajú znova.

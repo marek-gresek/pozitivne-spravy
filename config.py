@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
 AI_ENDPOINT = os.getenv("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses")
+AI_TEXT_PROFILE = os.getenv("OPENAI_TEXT_PROFILE", "")
+ARTICLE_BATCH_SIZE = 16
+ARTICLE_INPUT_BYTES = 60_000
+ARTICLE_TEXT_BYTES = 12_000
 ALLOWED_MODELS = ("gpt-6-luna", "gpt-6.1-sol")
 ARTICLE_MODEL = "gpt-6-luna"
 EDITOR_MODEL = "gpt-6.1-sol"
