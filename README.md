@@ -26,18 +26,23 @@ Slovenský čitateľský web, ktorý zbiera správy z RSS, pripravuje krátke sl
 
 <img src="docs/screenshots/mobile.jpg" alt="Mobilné filtre so smajlíkmi a nové čitateľské ovládanie" width="360">
 
+### Zdroje správ
+
+![Zoznam 15 médií a 24 RSS kanálov na stránke O projekte](docs/screenshots/news-sources.jpg)
+
 Screenshoty zachytávajú verejné rozhranie; počty správ sa priebežne menia.
 
 ## Čo projekt robí
 
 - Zbiera články z 24 slovenských, českých a anglických RSS kanálov; nové správy kontroluje každé dve hodiny.
+- Na stránke **O projekte** zobrazuje všetkých 15 médií a ich 24 RSS kanálov s odkazmi na weby aj feedy. Zoznam vychádza priamo z konfigurácie zberu správ.
 - Pred AI vyberie najviac **80 udalostí denne**, najviac **8 na vydavateľa**. Miesta uvoľňuje postupne v dvojhodinových oknách počas dňa (`Europe/Prague`); nevyužité miesta sa prenášajú v rámci dňa. Opakované pokusy a reštarty nepridávajú nové miesta.
 - Bežné správy vyberá najviac 48 hodín od publikovania, zamerané pozitívne zdroje majú sedemdňové okno. Uprednostňuje vedu, zdravie, vzdelávanie a životné prostredie, pričom strieda témy a vydavateľov. Opakované vyjadrenia, drobné incidenty a priebežné živé prenosy majú nižšiu prioritu.
 - Veľmi podobné udalosti zozbierané pred AI konzervatívne spojí podľa pôvodných titulkov, RSS výňatkov, čísel a času. Vyberie podklad s vyššou prioritou a informatívnejším výňatkom; ďalšie zdroje pripojí po úspešnej analýze. Ide o lokálny odhad podobnosti, ktorý nemusí zachytiť napríklad preklady tej istej udalosti.
 - Úvodná stránka ukazuje **20 vybraných správ**; odkaz **Všetky správy** otvorí úplný zoznam. Štatistiky počítajú všetky články vo vybranom období. Archív sa nemaže ani spätne neobmedzuje.
 - Pomocou OpenAI API vytvorí slovenský titulok, súhrn, sentiment s vysvetlením, tému, štítky, osoby, organizácie a miesta.
 - Ponúka kombinované filtre, vyhľadávanie, textový archív a detail s odkazom na originál. Filtre aj stránkovanie sa dajú zdieľať cez URL.
-- Každý sentiment má samostatné stránkovanie: pri troch neprázdnych kategóriách po 10 kartách, pri dvoch po 15 a pri jednej 30.
+- V úplnom zozname má každý sentiment samostatné stránkovanie: pri troch neprázdnych kategóriách po 10 kartách, pri dvoch po 15 a pri jednej 30.
 - Označí články pridané od poslednej návštevy a umožní označiť novinky ako prečítané. Rozhoduje čas pridania, takže zachytí aj oneskorene spracované články.
 - Ikonou záložky uložíte najviac 300 článkov do sekcie **Uložené**. Zoznam aj kompaktné zobrazenie zostávajú v danom prehliadači, bez účtu a synchronizácie medzi zariadeniami. Vymazanie miestneho úložiska odstráni tieto nastavenia.
 - Lokálne zoskupí veľmi podobné články o jednej udalosti do rozbaliteľnej karty. Zachová všetky články, ich vlastné súhrny a zdroje. Zoskupenie možno vypnúť vo filtroch; štatistiky vždy počítajú články.
@@ -48,6 +53,16 @@ Screenshoty zachytávajú verejné rozhranie; počty správ sa priebežne menia.
 - Má responzívny vzhľad, svetlú a tmavú tému a súkromnú administráciu so stavom fronty, zdrojov, tokenov a úložiska.
 
 Automatická analýza sa môže pomýliť. Sentiment opisuje udalosť, nie kvalitu média. Úplný kontext treba hľadať v pôvodnom článku.
+
+## Zdroje správ
+
+Aktuálny zoznam je dostupný na [webe · Zdroje správ](https://news.mhomeslab.com/o-projekte#zdroje). Členstvo kanálov určuje `RSS_FEEDS` v [config.py](config.py); stránka ho používa aj na zobrazenie zoznamu. Názvy médií a odkazy na ich weby sú zobrazovacie údaje v [app.py](app.py).
+
+- **Slovenské médiá:** SME, Denník N, Aktuality.sk, Pravda, Teraz.sk, TREND, Žilinak.sk a Živé.sk.
+- **České médiá:** iDNES.cz.
+- **Zahraničné médiá:** BBC News, Good News Network, Positive News, The Optimist Daily, Good Good Good a Reasons to be Cheerful.
+
+Jedno médium môže mať viac kanálov. Zoznam na webe ukazuje aktuálnu konfiguráciu; dostupnosť jednotlivých feedov sleduje administrácia.
 
 ## Architektúra
 

@@ -1,5 +1,11 @@
 # Zmeny
 
+## Verejný zoznam zdrojov · 2026-10-03
+
+- Stránka O projekte obsahuje 15 médií a všetkých 24 nakonfigurovaných RSS kanálov, rozdelených na slovenské, české a zahraničné zdroje, s odkazmi na weby aj feedy.
+- Obsahové verzie štýlov a skriptov zabezpečujú načítanie aktuálnych súborov pri bežnom obnovení stránky.
+- README obsahuje aktuálny prehľad zdrojov a screenshot verejného zoznamu.
+
 ## Výber správ pred AI · 2026-10-03
 
 - Najviac 80 nových udalostí denne, osem od vydavateľa a postupné uvoľňovanie miest počas dňa; všetkých 24 RSS kanálov zostáva aktívnych.
