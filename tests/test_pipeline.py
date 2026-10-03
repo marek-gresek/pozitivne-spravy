@@ -74,7 +74,9 @@ def test_conditional_fetch_and_same_canonical_url_queue_once(db, monkeypatch):
     assert pipeline.collect_feeds(session) == 0
     assert session.calls[1]['If-None-Match'] == 'etag'
     assert session.calls[1]['If-Modified-Since'] == 'date'
-    with database.connect() as c: assert c.execute('SELECT count(*) FROM tasks').fetchone()[0] == 1
+    with database.connect() as c:
+        assert c.execute('SELECT count(*) FROM tasks').fetchone()[0] == 1
+        assert c.execute('SELECT state FROM tasks').fetchone()[0] == 'candidate'
 
 
 def test_completed_text_duplicate_creates_alias_without_inference(db, monkeypatch):

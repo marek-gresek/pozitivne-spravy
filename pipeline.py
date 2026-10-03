@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from ai_client import AIError,ResponsesClient,json_result
 from config import RSS_FEEDS,USER_AGENT,TOPICS,SENTIMENTS,ARTICLE_MODEL,EDITOR_MODEL,ANALYSIS_VERSION,ARTICLE_BATCH_SIZE,ARTICLE_INPUT_BYTES,ARTICLE_TEXT_BYTES
 from database import connect,utcnow,setting,set_setting
+from curation import publish_aliases
 
 UTC=timezone.utc
 
@@ -70,8 +71,8 @@ def collect_feeds(session=None):
                     payload={'id':article_id,'link':entry['link'],'canonical_url':canonical,'title':entry['title'],
                         'source_id':sid,'language':meta['jazyk'],'category':meta['kategoria'],
                         'published_at':publication(entry),'excerpt':BeautifulSoup(entry.get('summary',''),'html.parser').get_text(' ',strip=True)}
-                    cur=c.execute('INSERT OR IGNORE INTO tasks(id,payload,available_at,created_at,updated_at) VALUES(?,?,?,?,?)',
-                        (article_id,json.dumps(payload,ensure_ascii=False),utcnow(),utcnow(),utcnow()))
+                    cur=c.execute('INSERT OR IGNORE INTO tasks(id,payload,state,available_at,created_at,updated_at) VALUES(?,?,?,?,?,?)',
+                        (article_id,json.dumps(payload,ensure_ascii=False),'candidate',utcnow(),utcnow(),utcnow()))
                     added+=cur.rowcount
                 c.execute('UPDATE sources SET etag=?,last_modified=?,last_check=?,last_success=?,error=NULL WHERE id=?',
                     (response.headers.get('ETag'),response.headers.get('Last-Modified'),utcnow(),utcnow(),sid))
@@ -109,6 +110,8 @@ def claim_tasks(limit=ARTICLE_BATCH_SIZE):
         c.execute('BEGIN IMMEDIATE')
         c.execute("UPDATE tasks SET state='failed',lease_until=NULL,error='invalid_task_payload' WHERE kind='article' AND state IN ('pending','processing') AND (NOT json_valid(payload) OR json_type(CASE WHEN json_valid(payload) THEN payload ELSE 'null' END)<>'object')")
         c.execute("UPDATE tasks SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'pending' END,lease_until=NULL,error='lease_expired' WHERE state='processing' AND lease_until<?",(now,))
+        if c.execute("SELECT 1 FROM settings WHERE key='editorial_started_at'").fetchone():
+            c.execute("UPDATE tasks SET state='candidate' WHERE kind='article' AND state='pending' AND NOT EXISTS(SELECT 1 FROM editorial_reservations r WHERE r.task_id=tasks.id AND r.day=? )",(datetime.fromisoformat(now).astimezone(ZoneInfo('Europe/Prague')).date().isoformat(),))
         cursor=setting('source_cursor','')
         rows=c.execute("""SELECT * FROM (SELECT *,row_number() OVER(PARTITION BY json_extract(payload,'$.source_id') ORDER BY json_extract(payload,'$.published_at') DESC,created_at) source_rank FROM tasks WHERE kind='article' AND state='pending' AND attempts<3 AND (available_at IS NULL OR available_at<=?)) ORDER BY source_rank,CASE WHEN coalesce(json_extract(payload,'$.source_id'),'')>? THEN 0 ELSE 1 END,json_extract(payload,'$.source_id'),created_at LIMIT ?""",(now,cursor,limit)).fetchall()
         for row in rows:c.execute("UPDATE tasks SET state='processing',lease_until=?,attempts=attempts+1,updated_at=? WHERE id=?",(lease,now,row['id']))
@@ -279,7 +282,7 @@ def process_queue(client=None,max_batches=None):
                     with connect() as c:
                         c.execute('INSERT OR IGNORE INTO article_aliases VALUES(?,?,?,?)',(duplicate['id'],item['source_id'],item['canonical_url'],item['title']))
                         c.execute("UPDATE tasks SET state='done',lease_until=NULL,updated_at=? WHERE id=?",(utcnow(),item['id']))
-                    completed+=1;continue
+                    publish_aliases();completed+=1;continue
                 if item['content_hash'] in batch_hashes:
                     batch_aliases.setdefault(batch_hashes[item['content_hash']],[]).append(item)
                     continue
@@ -302,7 +305,7 @@ def process_queue(client=None,max_batches=None):
                     if result is None:
                         for candidate in [original]+batch_aliases.get(original['id'],[]):fail_task(candidate['id'],'invalid_analysis')
                         continue
-                    save_result(original,result,model);completed+=1
+                    save_result(original,result,model);publish_aliases();completed+=1
                     with connect() as c:
                         for alias in batch_aliases.get(original['id'],[]):
                             c.execute('INSERT OR IGNORE INTO article_aliases VALUES(?,?,?,?)',(original['id'],alias['source_id'],alias['canonical_url'],alias['title']))
@@ -321,6 +324,7 @@ def process_queue(client=None,max_batches=None):
             except (ValueError,json.JSONDecodeError):
                 for item in group:
                     for candidate in [item]+batch_aliases.get(item['id'],[]):fail_task(candidate['id'],'invalid_analysis')
+    publish_aliases()
     return completed
 
 def normalize_legacy_urls():

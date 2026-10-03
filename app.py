@@ -17,6 +17,7 @@ import database
 import config
 from security import access_required
 from web_queries import ARTICLE_COLUMNS, article, json_list, list_articles, resolve_reader_ids
+from curation import editorial_status
 from story_groups import group_articles, load_aliases, signature, similar
 
 
@@ -205,6 +206,7 @@ def create_app():
     def admin():
         if 'csrf' not in session: session['csrf']=secrets.token_urlsafe(32)
         with database.connect() as c:
+            editorial=editorial_status(c)
             sources=[dict(r) for r in c.execute('SELECT * FROM sources ORDER BY name')]
             tasks=[dict(r) for r in c.execute('SELECT id,kind,state,attempts,error,updated_at FROM tasks ORDER BY updated_at DESC LIMIT 100')]
             counts={r['state']:r['n'] for r in c.execute('SELECT state,count(*) n FROM tasks GROUP BY state')}
@@ -218,7 +220,7 @@ def create_app():
         disk=shutil.disk_usage(audio_dir if audio_dir.exists() else audio_dir.resolve().parent) if audio_dir.resolve().parent.exists() else None
         audio_bytes=sum(p.stat().st_size for p in audio_dir.glob('*.mp3')) if audio_dir.exists() else 0
         return render_template('admin.html',sources=sources,tasks=tasks,counts=counts,usage=usage,episodes=episodes,runs=runs,
-                               paused=database.setting('pipeline_paused','0')=='1',csrf=session['csrf'],disk=disk,audio_bytes=audio_bytes,usage_totals=usage_totals)
+                               editorial=editorial,paused=database.setting('pipeline_paused','0')=='1',csrf=session['csrf'],disk=disk,audio_bytes=audio_bytes,usage_totals=usage_totals)
 
     @app.post('/admin/action')
     @access_required
@@ -231,7 +233,7 @@ def create_app():
             target=request.form.get('target',''); target_type=request.form.get('target_type','task')
             with database.connect() as c:
                 if target_type=='task':
-                    c.execute("UPDATE tasks SET state='pending',attempts=0,error=NULL,lease_until=NULL,available_at=?,updated_at=? WHERE id=? AND state='failed'",(database.utcnow(),database.utcnow(),target))
+                    c.execute("UPDATE tasks SET state=CASE WHEN EXISTS(SELECT 1 FROM settings WHERE key='editorial_started_at') AND NOT EXISTS(SELECT 1 FROM editorial_reservations r WHERE r.task_id=tasks.id) THEN 'candidate' ELSE 'pending' END,attempts=0,error=NULL,lease_until=NULL,available_at=?,updated_at=? WHERE id=? AND state='failed'",(database.utcnow(),database.utcnow(),target))
                 elif target_type=='episode':
                     c.execute("UPDATE episodes SET status='pending',attempts=0,available_at=NULL,error=NULL,lease_until=NULL WHERE id=? AND status='failed'",(target,))
                 else: abort(400)

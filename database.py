@@ -69,6 +69,9 @@ def init_db():
             transcript TEXT,chapters TEXT DEFAULT '[]',article_ids TEXT DEFAULT '[]',status TEXT NOT NULL DEFAULT 'pending',
             audio_file TEXT,duration REAL,published_at TEXT,expires_at TEXT,error TEXT,deleted_at TEXT,
             removed_bytes INTEGER DEFAULT 0,lease_until TEXT,created_at TEXT NOT NULL,UNIQUE(kind,day));
+        CREATE TABLE IF NOT EXISTS editorial_reservations(task_id TEXT PRIMARY KEY REFERENCES tasks(id),day TEXT NOT NULL,publisher TEXT NOT NULL,bucket TEXT NOT NULL,score REAL NOT NULL,selected_at TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS editorial_day ON editorial_reservations(day,publisher);
+        CREATE TABLE IF NOT EXISTS editorial_links(candidate_id TEXT PRIMARY KEY REFERENCES tasks(id),representative_id TEXT NOT NULL REFERENCES tasks(id),created_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS podcast_days(day TEXT PRIMARY KEY,status TEXT NOT NULL DEFAULT 'waiting',
             created_at TEXT NOT NULL,completed_at TEXT);

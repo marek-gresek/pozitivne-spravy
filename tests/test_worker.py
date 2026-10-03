@@ -59,6 +59,8 @@ def run_loops(monkeypatch,times,article_action=None):
     monkeypatch.setattr(worker,'datetime',Frozen)
     monkeypatch.setattr(worker.threading,'Thread',Thread)
     monkeypatch.setattr(worker,'collect_feeds',collect)
+    # Scheduling tests supply pre-admitted stub jobs; real admission is tested separately.
+    monkeypatch.setattr(worker,'select_candidates',lambda now=None:0)
     monkeypatch.setattr(worker,'process_queue',process)
     monkeypatch.setattr(worker,'process_episodes',podcasts)
     worker.run()

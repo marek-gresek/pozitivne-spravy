@@ -6,6 +6,10 @@ Slovenský čitateľský web, ktorý zbiera správy z RSS, pripravuje krátke sl
 
 ## Ako vyzerá V2
 
+### Stručný výber 20 správ s prístupom k úplnému zoznamu
+
+![Výber 20 správ, zachované smajlíky a štatistiky celého obdobia](docs/screenshots/editorial-selection.jpg)
+
 ### Prehľad na počítači a prehrávač s kapitolami
 
 ![Pozitívne správy V2 – široký prehľad, sentimentové štatistiky a podcastové kapitoly](docs/screenshots/desktop.jpg)
@@ -27,6 +31,10 @@ Screenshoty zachytávajú verejné rozhranie; počty správ sa priebežne menia.
 ## Čo projekt robí
 
 - Zbiera články z 24 slovenských, českých a anglických RSS kanálov; nové správy kontroluje každé dve hodiny.
+- Pred AI vyberie najviac **80 udalostí denne**, najviac **8 na vydavateľa**. Miesta uvoľňuje postupne v dvojhodinových oknách počas dňa (`Europe/Prague`); nevyužité miesta sa prenášajú v rámci dňa. Opakované pokusy a reštarty nepridávajú nové miesta.
+- Bežné správy vyberá najviac 48 hodín od publikovania, zamerané pozitívne zdroje majú sedemdňové okno. Uprednostňuje vedu, zdravie, vzdelávanie a životné prostredie, pričom strieda témy a vydavateľov. Opakované vyjadrenia, drobné incidenty a priebežné živé prenosy majú nižšiu prioritu.
+- Veľmi podobné udalosti zozbierané pred AI konzervatívne spojí podľa pôvodných titulkov, RSS výňatkov, čísel a času. Vyberie podklad s vyššou prioritou a informatívnejším výňatkom; ďalšie zdroje pripojí po úspešnej analýze. Ide o lokálny odhad podobnosti, ktorý nemusí zachytiť napríklad preklady tej istej udalosti.
+- Úvodná stránka ukazuje **20 vybraných správ**; odkaz **Všetky správy** otvorí úplný zoznam. Štatistiky počítajú všetky články vo vybranom období. Archív sa nemaže ani spätne neobmedzuje.
 - Pomocou OpenAI API vytvorí slovenský titulok, súhrn, sentiment s vysvetlením, tému, štítky, osoby, organizácie a miesta.
 - Ponúka kombinované filtre, vyhľadávanie, textový archív a detail s odkazom na originál. Filtre aj stránkovanie sa dajú zdieľať cez URL.
 - Každý sentiment má samostatné stránkovanie: pri troch neprázdnych kategóriách po 10 kartách, pri dvoch po 15 a pri jednej 30.
@@ -44,7 +52,7 @@ Automatická analýza sa môže pomýliť. Sentiment opisuje udalosť, nie kvali
 ## Architektúra
 
 ```text
-RSS → kontrola duplicít → extrakcia článku → trvalá fronta
+24 RSS → kandidáti → lokálny výber + duplicity → extrakcia + fronta
                                               ↓
                                       OpenAI Responses API
                                               ↓
@@ -98,7 +106,8 @@ Ak web zverejňujete, použite HTTPS a nakonfigurujte ochranu administrácie. Ve
 
 ### Plánovanie a retencia
 
-- RSS: každé dve hodiny.
+- RSS: všetkých 24 kanálov každé dve hodiny.
+- Výber: najviac 80 udalostí za miestny kalendárny deň, najviac 8 od vydavateľa; postupný kumulatívny limit v 12 dvojhodinových oknách. Odložené podklady zostávajú vo fronte do uplynutia ich časového okna, príliš staré sa označia bez AI volania. Denný limit sa týka nových výberov článkov, nie tokenov alebo počtu opráv.
 - Obe epizódy: po 09:00 `Europe/Prague`, zo správ predchádzajúceho kalendárneho dňa. Nevybavené dni zostávajú v trvalej fronte aj po výpadku.
 - Scenár: najviac 15 lokálne vybraných rozmanitých tém; pri malom počte správ kratšie vydanie.
 - Audio: nedostupné po 14 dňoch od publikovania, fyzické čistenie každú hodinu, vrátane poslednej epizódy.
@@ -109,7 +118,7 @@ Ak web zverejňujete, použite HTTPS a nakonfigurujte ochranu administrácie. Ve
 
 ### Diagnostika
 
-`/healthz` kontroluje web a `/readyz` pripravenosť databázy. Administrácia ukazuje aj vstupné, výstupné, cached a reasoning tokeny. Cached tokeny sú súčasťou vstupu a reasoning tokeny sú súčasťou výstupu; do celkového súčtu sa nepripočítavajú druhýkrát. Cena závisí od dostupných modelov a vašej tarify OpenAI API.
+`/healthz` kontroluje web a `/readyz` pripravenosť databázy. Administrácia ukazuje dnešný výber a aktuálne otvorené miesta, kandidátov, duplicity, vyradené podklady a čitateľné dôvody odloženia. Ukazuje aj vstupné, výstupné, cached a reasoning tokeny. Cached tokeny sú súčasťou vstupu a reasoning tokeny sú súčasťou výstupu; do celkového súčtu sa nepripočítavajú druhýkrát. Cena závisí od dostupných modelov a vašej tarify OpenAI API.
 
 Pred ručnými úlohami zastavte pracovníka, aby ste nevytvorili druhý súbežný proces:
 

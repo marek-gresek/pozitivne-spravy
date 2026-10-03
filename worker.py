@@ -12,6 +12,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 from database import init_db,connect,utcnow,setting,set_setting,DB_FILE
 from pipeline import collect_feeds,process_queue,register_sources,normalize_legacy_urls
+from curation import select_candidates
 from podcasts import ensure_episodes,process_episodes,cleanup_audio
 
 stop=threading.Event()
@@ -103,6 +104,7 @@ def run():
             if result is not None:set_setting('last_rss_slot',slot)
         schedule_podcast_days(now)
         if setting('pipeline_paused','0')!='1':
+            select_candidates(now)
             run_record('articles',slot,lambda:process_queue(max_batches=1))
             eligible=ready_podcast_days()
             if eligible:
@@ -127,8 +129,10 @@ def main():
         try:fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:raise SystemExit('worker_already_running')
         if args.command=='run':run()
-        elif args.command=='process':print('processed',process_queue(max_batches=args.batches))
-        else:ensure_episodes(args.day);print('episodes',process_episodes())
+        elif args.command=='process':
+            select_candidates();print('processed',process_queue(max_batches=args.batches))
+        else:
+            select_candidates();ensure_episodes(args.day);print('episodes',process_episodes())
 
 if __name__=='__main__':
     for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,lambda *_:stop.set())

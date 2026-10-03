@@ -1,5 +1,13 @@
 # Zmeny
 
+## Výber správ pred AI · 2026-10-03
+
+- Najviac 80 nových udalostí denne, osem od vydavateľa a postupné uvoľňovanie miest počas dňa; všetkých 24 RSS kanálov zostáva aktívnych.
+- Konzervatívne zoskupovanie titulkov a RSS výňatkov pred AI s pripojením ďalších zdrojov po analýze.
+- Priorita užitočných tém, pestrosť zdrojov, 48-hodinové okno bežných správ a sedem dní pre pozitívne zamerané zdroje.
+- Úvodná stránka s 20 správami a odkazom na úplný prehľad; existujúci textový archív a štatistiky zostávajú zachované.
+- Trvalé rezervácie miest a dôvody odloženia či vyradenia v administrácii; opakované pokusy neobchádzajú limit.
+
 ## Úsporné spracovanie · 2026-10-03
 
 - Dávky najviac po 16 článkoch, lokálne čistenie podkladov a výber odsekov z dlhých textov; pôvodný archív ostáva zachovaný.
