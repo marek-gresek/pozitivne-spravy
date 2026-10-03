@@ -1,6 +1,8 @@
 """Read-side queries: parameterized filters and literal FTS phrases."""
 import json
 import math
+import hashlib
+import re
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 from urllib.parse import urlencode
@@ -12,6 +14,15 @@ PAGE_SIZE = 30
 # Full article bodies are unnecessary on public reading pages.
 ARTICLE_COLUMNS = ','.join('a.'+name for name in ('id','nadpis','link','zhrnutie','sentiment','kategoria','povodny_nadpis','canonical_url','source_id','published_at','created_at','topic','region','tags','entities','sentiment_reason','source_scope'))
 
+def reader_key(article_id):
+    """Keep normal IDs; expose a bounded opaque reference for legacy RSS URL IDs."""
+    return article_id if re.fullmatch(r'[A-Za-z0-9_-]{1,80}',article_id) else 'legacy-'+hashlib.sha256(article_id.encode('utf-8')).hexdigest()
+
+def resolve_reader_ids(connection, ids):
+    if not any(value.startswith('legacy-') for value in ids): return ids
+    mapping = {reader_key(row[0]):row[0] for row in connection.execute("SELECT id FROM clanky WHERE length(id)>80 OR length(id)=0 OR id GLOB '*[^A-Za-z0-9_-]*'")}
+    return [mapping.get(value,value) for value in ids]
+
 def json_list(value):
     try:
         parsed = json.loads(value or '[]')
@@ -21,6 +32,7 @@ def json_list(value):
 
 def article(row):
     result = dict(row)
+    result['reader_id'] = reader_key(result['id'])
     result['tags'] = json_list(result.get('tags'))
     result['entities'] = json_list(result.get('entities'))
     return result
@@ -47,7 +59,8 @@ def list_articles(args, archive=False, saved_ids=None):
     conditions, params = [], []
     if saved_view:
         if saved_ids:
-            conditions.append('a.id IN (' + ','.join('?' for _ in saved_ids) + ')'); params.extend(saved_ids)
+            with connect() as c: lookup_ids=resolve_reader_ids(c,saved_ids)
+            conditions.append('a.id IN (' + ','.join('?' for _ in lookup_ids) + ')'); params.extend(lookup_ids)
         else: conditions.append('0')
     if not archive: conditions.append("datetime(a.published_at)>=datetime('now','-48 hours') AND datetime(a.published_at)<=datetime('now')")
     if selected:

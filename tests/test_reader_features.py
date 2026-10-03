@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import database
 from story_groups import group_articles
 from test_web import web, insert_article
+from web_queries import reader_key
 
 
 def story(article_id, title='Vedci objavili nový spôsob recyklácie lítiových batérií', **changes):
@@ -150,3 +151,19 @@ def test_new_article_detection_uses_arrival_time_not_publication(web):
         body = client.get(path).data
         assert b'data-first-seen="2026-10-03 12:00:00"' in body
         assert b'data-new-badge' in body and b'data-save-id="arrived-late"' in body
+
+
+def test_legacy_url_ids_have_working_details_and_browser_bookmarks(web):
+    client,_=web
+    legacy='https://example.com/news/pribeh?utm_source=rss&utm_campaign=archiv'
+    insert_article(legacy,title='Historický článok s URL identifikátorom')
+    key=reader_key(legacy)
+    assert key.startswith('legacy-') and len(key)==71
+    body=client.get('/archiv').data.decode()
+    assert 'data-save-id="'+key+'"' in body and '/clanok/'+key in body
+    assert client.get('/clanok/'+key).status_code==200
+    saved=client.get('/ulozene',headers={'X-Saved-Articles':key})
+    assert saved.status_code==200 and 'Historický článok s URL identifikátorom'.encode() in saved.data
+    with database.connect() as c:
+        assert c.execute('SELECT id FROM clanky').fetchone()[0]==legacy
+        assert c.execute('SELECT count(*) FROM ai_usage').fetchone()[0]==0

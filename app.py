@@ -16,7 +16,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import database
 import config
 from security import access_required
-from web_queries import ARTICLE_COLUMNS, article, json_list, list_articles
+from web_queries import ARTICLE_COLUMNS, article, json_list, list_articles, resolve_reader_ids
 from story_groups import group_articles, load_aliases, signature, similar
 
 
@@ -113,6 +113,7 @@ def create_app():
     @app.get('/clanok/<article_id>')
     def detail(article_id):
         with database.connect() as c:
+            article_id=resolve_reader_ids(c,[article_id])[0]
             row=c.execute('SELECT '+ARTICLE_COLUMNS+',s.name source_name FROM clanky a LEFT JOIN sources s ON s.id=a.source_id WHERE a.id=?',(article_id,)).fetchone()
             if not row: abort(404)
             aliases=[dict(r) for r in c.execute('SELECT al.*,s.name source_name FROM article_aliases al LEFT JOIN sources s ON s.id=al.source_id WHERE article_id=?',(article_id,))]
