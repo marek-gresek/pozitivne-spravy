@@ -12,7 +12,7 @@ import worker
 from test_pipeline import Client,result
 from test_web import web,insert_article,access_token
 from werkzeug.datastructures import MultiDict
-from web_queries import list_articles
+from web_queries import list_articles, highlight_sections
 
 UTC=timezone.utc
 PRAGUE=ZoneInfo('Europe/Prague')
@@ -84,13 +84,41 @@ def test_freshness_windows_preserve_archive_and_do_not_infer(db):
     with database.connect() as c:assert c.execute('SELECT nadpis FROM clanky WHERE id="archive"').fetchone()
 
 
-def test_prefer_useful_topics_and_small_publishers_over_repeated_statements(db):
+def test_newer_political_news_is_not_displaced_by_preferred_topics(db):
     early=NOW.replace(hour=0)
-    for n in range(12):candidate('p'+str(n),pub='big.example',published=early-timedelta(hours=1),title=f'Politik vyhlásil nové vyjadrenie a kritizoval opozíciu {n}')
-    for n in range(4):candidate('s'+str(n),pub=f'small{n}.example',published=early-timedelta(hours=1),title=f'Vedci objavili novú účinnú liečbu ochorenia {n}',category='Zdravie')
+    for n in range(6):candidate('p'+str(n),pub=f'politics{n}.example',published=early-timedelta(hours=1),title=f'Politik vyhlásil nové vyjadrenie a kritizoval opozíciu {n}')
+    for n in range(6):candidate('s'+str(n),pub=f'science{n}.example',published=early-timedelta(hours=24),title=f'Vedci objavili novú účinnú liečbu ochorenia {n}')
     curation.select_candidates(early)
     with database.connect() as c:ids={r[0] for r in c.execute('SELECT task_id FROM editorial_reservations')}
-    assert {'s0','s1','s2','s3'}<=ids and len(ids)==6
+    assert ids=={'p0','p1','p2','p3','p4','p5'}
+
+
+def test_admission_score_has_no_topic_keyword_or_positive_publisher_bias():
+    base={'published_at':(NOW-timedelta(hours=1)).isoformat(),'excerpt':'Rovnako dlhý informačný podklad o aktuálnej udalosti.'}
+    variants=[
+        {'title':'Politik vyhlásil reakciu a kritizoval opozíciu online','category':'Politika','publisher':'politics.example'},
+        {'title':'Nehoda a lúpež, polícia zadržala podozrivého','category':'Slovensko','publisher':'news.example'},
+        {'title':'Vedci objavili novú liečbu v nemocnici','category':'Zdravie','publisher':'positive.news'},
+        {'title':'Študenti chránia prírodu a klímu','category':'Vzdelávanie','publisher':'school.example'},
+    ]
+    assert len({curation.score({**base,**variant},NOW) for variant in variants})==1
+
+
+def test_home_highlight_does_not_hide_newer_politics_behind_science():
+    articles=[
+        {'id':'politics','topic':'Politika','link':'https://politics.example/a','published_at':'2026-10-05T10:00:00Z'},
+        {'id':'science','topic':'Veda a technológie','link':'https://science.example/a','published_at':'2026-10-05T09:00:00Z'},
+    ]
+    sections=highlight_sections([{'sentiment':'Neutrálny','articles':articles}],limit=1)
+    assert sections[0]['articles'][0]['id']=='politics'
+
+
+def test_about_page_describes_neutral_topic_policy(web):
+    client,_=web
+    page=client.get('/o-projekte')
+    assert page.status_code==200
+    assert 'politika má rovnaké podmienky'.encode() in page.data
+    assert 'vyššou prioritou vedy'.encode() not in page.data
 
 
 def test_same_event_guards_and_best_rss_context_selected_once(db):

@@ -17,16 +17,6 @@ DAILY_LIMIT=80
 PUBLISHER_LIMIT=8
 PRAGUE=ZoneInfo('Europe/Prague')
 EVERGREEN={'goodnewsnetwork.org','positive.news','optimistdaily.com','goodgoodgood.co','reasonstobecheerful.world'}
-PREFERRED={
- 'Veda a technológie':{'veda','vedci','výskum','vyskum','výzkum','vedcu','science','scientists','research','technológ','technology','bater','objav'},
- 'Zdravie':{'zdrav','lieč','lec','nemocnic','health','medical','medicine','cancer','therapy','vakc'},
- 'Vzdelávanie':{'vzdel','škol','skol','študent','student','education','school','učiteľ','ucitel'},
- 'Životné prostredie':{'prírod','prirod','klím','klim','recykl','environment','climate','renewable','biodiversity','ochran','solar'},
-}
-LOW_PRIORITY={'vrah','vyjadril','vyhlásil','vyhlasil','reagoval','kritizoval','politician','slammed','reakcia','vražd','vrazd','nehod','lúpež','lupez','zadrž','zadrz','zatkl','live','online','minútu','minutu'}
-
-PREFERRED_PREFIXES={topic:{next(iter(words(prefix)),prefix) for prefix in prefixes} for topic,prefixes in PREFERRED.items()}
-LOW_PREFIXES={next(iter(words(prefix)),prefix) for prefix in LOW_PRIORITY}
 
 def publisher(value):
     host=urlsplit(value if '://' in (value or '') else 'https://'+(value or '')).hostname or 'unknown'
@@ -35,25 +25,9 @@ def publisher(value):
     return 'bbc.com' if host in ('bbc.co.uk','bbci.co.uk','bbc.com') else host
 
 
-def topic_hint(item):
-    text=' '.join((item.get('title',''),item.get('excerpt',''),item.get('category',''))).casefold()
-    terms=words(text)
-    scores={topic:sum(any(word.startswith(prefix) for word in terms) for prefix in prefixes) for topic,prefixes in PREFERRED_PREFIXES.items()}
-    best=max(scores,key=scores.get)
-    if scores[best]:return best
-    return item.get('category') or 'Ostatné'
-
-
-def preference(item):
-    text=words(item.get('title','')+' '+item.get('excerpt','')[:1200])
-    preferred=topic_hint(item) in PREFERRED
-    penalty=sum(any(word.startswith(prefix) for word in text) for prefix in LOW_PREFIXES)
-    return (4 if preferred else 0)+(2 if item['publisher'] in EVERGREEN else 0)-min(4,penalty)
-
-
 def score(item,now):
     age=max(0,(now.timestamp()-timestamp(item['published_at']))/3600)
-    return preference(item)+min(1,len(item.get('excerpt','').split())/100)+max(0,1-age/48)
+    return min(1,len(item.get('excerpt','').split())/100)+max(0,1-age/48)
 
 
 def same_event(a,b):
@@ -80,7 +54,7 @@ def read_payload(row,now):
         item['publisher']=publisher(row['source_name'] or item['canonical_url'])
         window=7*86400 if item['publisher'] in EVERGREEN else 48*3600
         if now.timestamp()-date>window:return None,'selection_too_old'
-        item['bucket']=topic_hint(item);item['score']=score(item,now)
+        item['bucket']=item.get('category') or 'Ostatné';item['score']=score(item,now)
         return item,None
     except (ValueError,TypeError,KeyError):return None,'invalid_candidate'
 

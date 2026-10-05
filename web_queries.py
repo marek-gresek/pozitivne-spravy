@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from config import SENTIMENTS, TOPICS
 from database import connect
 from story_groups import group_articles, load_aliases
-from curation import publisher, PREFERRED
+from curation import publisher
 
 PAGE_SIZE = 30
 # Full article bodies are unnecessary on public reading pages.
@@ -49,7 +49,7 @@ def highlight_sections(sections,limit=20):
     topics=Counter();publishers=Counter();total=0
     def priority(item):
         source=publisher(item.get('source_name') or item.get('link'));topic=item.get('topic')
-        return ((3 if topic in PREFERRED else 0)-2*publishers[source]-topics[topic],item.get('published_at') or '',item['id'])
+        return (-2*publishers[source]-topics[topic],item.get('published_at') or '',item['id'])
     while total<limit and any(pools.values()):
         for key,pool in pools.items():
             if not pool or total>=limit:continue
