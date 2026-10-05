@@ -286,11 +286,48 @@ def test_private_fixed_voice_server_returns_actual_wav_and_bounded_cpu_contract(
     client,options,spoken=private_speech_server
     response=client.post('/synthesize',json={'text':'  Dobrá správa.  ','voice':'M1'})
     assert response.status_code==200 and response.mimetype=='audio/wav' and response.data[:4]==b'RIFF'
-    assert spoken==[('Dobrá správa.',{'voice_style':'approved-style','lang':'sk','total_steps':16,'speed':1.0,'silence_duration':0.35})]
+    assert spoken==[('Dobrá správa.',{'voice_style':'approved-style','lang':'sk','total_steps':16,'speed':1.15,'silence_duration':0.2})]
     with wave.open(io.BytesIO(response.data),'rb') as wav:
         assert wav.getnchannels()==1 and wav.getnframes()==100 and wav.getframerate()==44100
     assert options==[{'model':'supertonic-3','model_dir':'/voices','auto_download':False,'intra_op_num_threads':1,'inter_op_num_threads':1}]
     assert client.get('/healthz').json=={'status':'ok','voice':'M1','model':'supertonic-3','language':'sk'}
+
+
+def test_private_speech_compacts_long_pauses_and_preserves_every_spoken_sample(private_speech_server,monkeypatch):
+    import io
+    import wave
+    import numpy as np
+    client,_,_=private_speech_server
+    owner=client.application.view_functions['synthesize'].__globals__
+    sr=owner['engine'].sample_rate
+    # Three spoken passages, a normal 0.2-s pause, and an excessive 2-s gap.
+    voice=np.tile(np.array([0.1,-0.1]),sr//2)
+    short=np.zeros(round(sr*0.2));long=np.zeros(sr*2)
+    source=np.concatenate([voice,short,voice,long,voice])
+    monkeypatch.setattr(owner['engine'],'synthesize',lambda *args,**kwargs:(source,[]))
+    response=client.post('/synthesize',json={'text':'Prvá veta. Druhá veta. Tretia veta.','voice':'M1'})
+    assert response.status_code==200
+    with wave.open(io.BytesIO(response.data)) as wav:
+        output=np.frombuffer(wav.readframes(wav.getnframes()),dtype='<i2')
+    assert output.size==round(sr*3.6)
+    expected=(np.concatenate([voice,short,voice,np.zeros(round(sr*0.4)),voice])*32767).astype('<i2')
+    np.testing.assert_array_equal(output,expected)
+
+
+@pytest.mark.parametrize('seconds',[0.02,0.2,0.8,0.9])
+def test_private_speech_preserves_short_pauses_and_quiet_word_edges(private_speech_server,seconds):
+    import numpy as np
+    client,_,_=private_speech_server
+    owner=client.application.view_functions['synthesize'].__globals__
+    sr=owner['engine'].sample_rate
+    source=np.concatenate([np.full(sr,0.0001),np.zeros(round(sr*seconds)),np.full(sr,0.003)])
+    # Long near-silence keeps 0.2 s at both edges, including low-volume samples.
+    compact=owner['shorten_long_pauses'](source,sr)
+    np.testing.assert_array_equal(compact[:round(sr*0.2)],source[:round(sr*0.2)])
+    np.testing.assert_array_equal(compact[-sr:],source[-sr:])
+    voice=np.full(sr,0.01)
+    short=np.concatenate([voice,np.zeros(round(sr*seconds)),voice])
+    np.testing.assert_array_equal(owner['shorten_long_pauses'](short,sr),short)
 
 
 @pytest.mark.parametrize('payload',[['bad-root'],'bad-root',123,{'text':'x'*601},{'text':'   '},{'text':'Allowed text','voice':'other-voice'}])

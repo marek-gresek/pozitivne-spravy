@@ -1,5 +1,11 @@
 # Zmeny
 
+## Plynulejšie nahovorenie · 2026-10-05
+
+- Podcastový scenár používa prirodzené celé vety, krátke prechody a jeden odsek na kapitolu bez režijných značiek, SSML či dramatickej interpunkcie.
+- Supertonic 3 M1 má natívne tempo 1.15 a kratšie medzery medzi blokmi; dlhé úseky veľmi tichého audia sa konzervatívne skracujú so zachovaním ich okrajov.
+- Tempo 140–160 slov za minútu je orientačný redakčný cieľ, nie garantovaná hodnota. Existujúce audio, prepisy a merané časy kapitol sa spätne nemenia.
+
 ## Verejný zoznam zdrojov · 2026-10-03
 
 - Stránka O projekte obsahuje 15 médií a všetkých 24 nakonfigurovaných RSS kanálov, rozdelených na slovenské, české a zahraničné zdroje, s odkazmi na weby aj feedy.
