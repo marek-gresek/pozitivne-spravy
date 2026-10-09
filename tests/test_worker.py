@@ -153,6 +153,86 @@ def test_job_failure_is_sanitized_and_recorded(db):
     assert 'PRIVATE' not in str(row)
 
 
+@pytest.mark.parametrize('phase',['insert','success','failure'])
+def test_job_recording_survives_real_sqlite_writer_lock(db,monkeypatch,caplog,phase):
+    import sqlite3
+    def quick_connect():
+        c=sqlite3.connect(database.DB_FILE,timeout=0.02,factory=database.ClosingConnection)
+        c.row_factory=sqlite3.Row
+        return c
+    monkeypatch.setattr(worker,'connect',quick_connect)
+    holder=sqlite3.connect(database.DB_FILE)
+    calls=[]
+    def work():
+        calls.append('called')
+        holder.execute('BEGIN IMMEDIATE')
+        if phase=='failure':raise RuntimeError('PRIVATE credentials')
+        return 0
+    try:
+        if phase=='insert':holder.execute('BEGIN IMMEDIATE')
+        assert worker.run_record('cleanup','locked',work) is None
+        assert len(calls)==(0 if phase=='insert' else 1)
+    finally:
+        holder.rollback();holder.close()
+    assert worker.run_record('cleanup','recovered',lambda:0)==0
+    with database.connect() as c:
+        assert c.execute("SELECT status FROM job_runs WHERE window='recovered'").fetchone()[0]=='success'
+    assert 'PRIVATE' not in caplog.text
+
+
+def test_maintenance_recovers_after_real_lock_even_when_error_status_cannot_be_written(db,monkeypatch,caplog):
+    import sqlite3
+    def quick_connect():
+        c=sqlite3.connect(database.DB_FILE,timeout=0.02,factory=database.ClosingConnection)
+        c.row_factory=sqlite3.Row
+        return c
+    monkeypatch.setattr(database,'connect',quick_connect)
+    monkeypatch.setattr(worker,'connect',quick_connect)
+    holder=sqlite3.connect(database.DB_FILE);holder.execute('BEGIN IMMEDIATE')
+    cleanups=[];waits=[]
+    class Stop:
+        def is_set(self):return len(waits)>=2
+        def wait(self,seconds):
+            waits.append(seconds)
+            holder.rollback()
+    monkeypatch.setattr(worker,'stop',Stop())
+    monkeypatch.setattr(worker,'cleanup_audio',lambda:cleanups.append('cleanup') or 0)
+    try:worker.maintenance()
+    finally:holder.close()
+    assert waits==[60,3600] and cleanups==['cleanup']
+    assert database.setting('maintenance_error')==''
+    assert database.setting('worker_heartbeat')
+    backup=db/'backups'/(datetime.now(UTC).date().isoformat()+'.sqlite3')
+    with sqlite3.connect('file:'+str(backup)+'?mode=ro&immutable=1',uri=True) as c:
+        assert c.execute('PRAGMA quick_check').fetchone()[0]=='ok'
+    assert 'OperationalError' in caplog.text
+
+
+@pytest.mark.parametrize('boundary',['backup','heartbeat'])
+def test_maintenance_recovers_from_failure_outside_cleanup(db,monkeypatch,boundary):
+    waits=[];failures=[]
+    real_setting=worker.setting;real_set=worker.set_setting
+    def read(key,*args):
+        if boundary=='backup' and key=='last_backup_day' and not failures:
+            failures.append(key);raise OSError('PRIVATE backup error')
+        return real_setting(key,*args)
+    def write(key,value):
+        if boundary=='heartbeat' and key=='worker_heartbeat' and not failures:
+            failures.append(key);raise OSError('PRIVATE heartbeat error')
+        return real_set(key,value)
+    class Stop:
+        def is_set(self):return len(waits)>=2
+        def wait(self,seconds):waits.append(seconds)
+    monkeypatch.setattr(worker,'setting',read)
+    monkeypatch.setattr(worker,'set_setting',write)
+    monkeypatch.setattr(worker,'stop',Stop())
+    monkeypatch.setattr(worker,'cleanup_audio',lambda:0)
+    worker.maintenance()
+    assert failures and waits==[60,3600]
+    assert database.setting('maintenance_error')==''
+    assert database.setting('last_backup_day')==datetime.now(UTC).date().isoformat()
+
+
 def maintenance_once(monkeypatch):
     class Stop:
         complete=False

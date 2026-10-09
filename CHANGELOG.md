@@ -1,5 +1,11 @@
 # Zmeny
 
+## Odolná údržba · 2026-10-09
+
+- Dočasné zamknutie SQLite pri zápise stavu úlohy alebo údržby už neukončí vlákno pre zálohy a čistenie audia.
+- Neúspešná údržba sa zopakuje po minúte; úspešná pokračuje v hodinovom intervale. Chyba sa zaznamená aj vtedy, keď databáza neprijíma zápisy, bez citlivých údajov.
+- Po úspešnom cykle sa chybový stav vymaže. Zachováva sa 14-dňová retencia audia aj databázové zálohy bez MP3.
+
 ## Plynulejšie nahovorenie · 2026-10-05
 
 - Podcastový scenár používa prirodzené celé vety, krátke prechody a jeden odsek na kapitolu bez režijných značiek, SSML či dramatickej interpunkcie.

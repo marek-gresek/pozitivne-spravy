@@ -2,6 +2,7 @@
 import argparse
 import fcntl
 import json
+import logging
 import os
 import signal
 import threading
@@ -16,23 +17,33 @@ from curation import select_candidates
 from podcasts import ensure_episodes,process_episodes,cleanup_audio
 
 stop=threading.Event()
+logger=logging.getLogger(__name__)
 
 def run_record(kind,window,fn):
     rid=str(uuid.uuid4())
-    with connect() as c:c.execute('INSERT INTO job_runs(id,kind,window,status,started_at) VALUES(?,?,?,?,?)',(rid,kind,window,'running',utcnow()))
     try:
+        with connect() as c:c.execute('INSERT INTO job_runs(id,kind,window,status,started_at) VALUES(?,?,?,?,?)',(rid,kind,window,'running',utcnow()))
         result=fn()
         with connect() as c:c.execute("UPDATE job_runs SET status='success',finished_at=? WHERE id=?",(utcnow(),rid))
         return result
-    except Exception:
-        with connect() as c:c.execute("UPDATE job_runs SET status='failed',finished_at=?,error='job_failed' WHERE id=?",(utcnow(),rid))
+    except Exception as error:
+        # Reporting must still work when the database itself is unavailable.
+        # Log only the error class, never provider responses or credentials.
+        logger.error('Job %s failed (%s)',kind,type(error).__name__)
+        try:
+            with connect() as c:c.execute("UPDATE job_runs SET status='failed',finished_at=?,error='job_failed' WHERE id=?",(utcnow(),rid))
+        except Exception as recording_error:
+            logger.error('Job status unavailable (%s)',type(recording_error).__name__)
         return None
 
 def maintenance():
     while not stop.is_set():
-        run_record('cleanup',utcnow(),cleanup_audio)
-        # Database-only backups; never include audio. Keep fourteen daily snapshots.
+        # The entire cycle owns recovery, including status/heartbeat writes.
+        # A failed cycle retries promptly without killing this daemon thread.
+        delay=60
         try:
+            cleanup_result=run_record('cleanup',utcnow(),cleanup_audio)
+            # Database-only backups; never include audio. Keep fourteen daily snapshots.
             now=datetime.now(timezone.utc); day=now.date().isoformat()
             if setting('last_backup_day','')!=day:
                 import sqlite3
@@ -63,9 +74,15 @@ def maintenance():
                             except FileNotFoundError:pass
                         finally:os.close(fd)
                         set_setting('legacy_audio_bundle','')
-        except Exception:set_setting('maintenance_error','backup_or_retention_failed')
-        set_setting('worker_heartbeat',utcnow())
-        stop.wait(3600)
+            set_setting('maintenance_error','cleanup_failed' if cleanup_result is None else '')
+            set_setting('worker_heartbeat',utcnow())
+            if cleanup_result is not None:delay=3600
+        except Exception as error:
+            logger.error('Maintenance cycle failed (%s)',type(error).__name__)
+            try:set_setting('maintenance_error','backup_or_retention_failed')
+            except Exception as recording_error:
+                logger.error('Maintenance status unavailable (%s)',type(recording_error).__name__)
+        stop.wait(delay)
 
 def schedule_podcast_days(now):
     """Persist every due calendar day, even while inference is paused or blocked."""
